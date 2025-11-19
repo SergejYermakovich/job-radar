@@ -1,10 +1,16 @@
 package com.job.radar.service.handler;
 
 import com.job.radar.model.entity.Resume;
+import com.job.radar.model.enums.statemachine.event.FormEvent;
 import com.job.radar.model.enums.statemachine.event.MenuEvent;
+import com.job.radar.model.enums.statemachine.event.ResumeEvent;
+import com.job.radar.model.enums.statemachine.state.FormState;
 import com.job.radar.model.enums.statemachine.state.MenuState;
+import com.job.radar.model.enums.statemachine.state.ResumeState;
+import com.job.radar.service.KeyboardService;
 import com.job.radar.service.ResumeService;
 import com.job.radar.service.StateMachineManager;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.statemachine.StateMachine;
 import org.springframework.stereotype.Service;
 import org.telegram.telegrambots.meta.api.methods.BotApiMethod;
@@ -17,16 +23,22 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+import static com.job.radar.utils.ButtonConsts.*;
+
 @SuppressWarnings("deprecation")
+@Slf4j
 @Service
 public class NavigationHandler {
-
     private final StateMachineManager stateMachineManager;
     private final ResumeService resumeService;
+    private final KeyboardService keyboardService;
 
-    public NavigationHandler(StateMachineManager stateMachineManager, ResumeService resumeService) {
+    public NavigationHandler(StateMachineManager stateMachineManager,
+                             ResumeService resumeService,
+                             KeyboardService keyboardService) {
         this.stateMachineManager = stateMachineManager;
         this.resumeService = resumeService;
+        this.keyboardService = keyboardService;
     }
 
     public BotApiMethod<?> handleUpdate(Update update) {
@@ -36,55 +48,50 @@ public class NavigationHandler {
         Long chatId = update.getMessage().getChatId();
         String text = update.getMessage().getText();
 
-        // Проверяем специальные команды
-        if ("/start".equals(text)) {
-            stateMachineManager.cleanupUserSession(chatId); // Сбрасываем сессию
+        log.info("NavigationHandler text: {}, chat: {}", text, chatId);
+
+        if (CMD_START.equals(text)) {
+            stateMachineManager.cleanupUserSession(chatId);
             return showWelcomeMessage(chatId);
         }
 
-        if ("/cancel".equals(text)) {
+        if (CMD_CANCEL.equals(text)) {
             stateMachineManager.cleanupResumeMachine(chatId);
             return showMainMenu(chatId);
         }
 
-        // Основная логика обработки
         return handleNavigation(chatId, text);
     }
 
     private BotApiMethod<?> handleNavigation(Long chatId, String text) {
         MenuState currentMenuState = stateMachineManager.getCurrentMenuState(chatId);
 
-        switch (currentMenuState) {
-            case MAIN_MENU:
-                return handleMainMenu(chatId, text);
-
-            case RESUME_SECTION:
-                return handleResumeSection(chatId, text);
-
-            case VACANCIES_SECTION:
-                return handleVacanciesSection(chatId, text);
-
-            default:
-                return showMainMenu(chatId);
-        }
+        log.info("currentMenuState: {}, chat id: {}", currentMenuState, chatId);
+        return switch (currentMenuState) {
+            case MAIN_MENU -> handleMainMenu(chatId, text);
+            case RESUME_SECTION -> handleResumeSection(chatId, text);
+            case VACANCIES_SECTION -> handleVacanciesSection(chatId, text);
+            case SETTINGS_SECTION -> handleSettingsSection(chatId, text);
+            default -> showMainMenu(chatId);
+        };
     }
 
     private BotApiMethod<?> handleMainMenu(Long chatId, String text) {
         StateMachine<MenuState, MenuEvent> menuMachine = stateMachineManager.getMenuStateMachine(chatId);
 
         switch (text) {
-            case "📄 Моё резюме":
+            case MY_RESUME:
                 menuMachine.sendEvent(MenuEvent.OPEN_RESUME);
                 return enterResumeSection(chatId);
-
-            case "💼 Вакансии":
+            case VACANCIES:
                 menuMachine.sendEvent(MenuEvent.OPEN_VACANCIES);
-                return showVacanciesMenu(chatId);
-
-            case "⚙️ Настройки":
+                return keyboardService.showVacanciesMenu(chatId);
+            case SETTINGS:
                 menuMachine.sendEvent(MenuEvent.OPEN_SETTINGS);
-                return showSettings(chatId);
-
+                return keyboardService.showSettings(chatId);
+            case BACK:
+                menuMachine.sendEvent(MenuEvent.BACK);
+                return showMainMenu(chatId);
             default:
                 return showMainMenu(chatId);
         }
@@ -94,68 +101,79 @@ public class NavigationHandler {
         return SendMessage.builder()
                 .chatId(chatId.toString())
                 .text("👋 Добро пожаловать в JobRadar!\n\nЯ помогу вам создать резюме и найти работу.")
-                .replyMarkup(createMainMenuKeyboard())
+                .replyMarkup(keyboardService.createMainMenuKeyboard())
                 .build();
     }
 
     public BotApiMethod<?> handleResumeSection(Long chatId, String text) {
+        // Обработка кнопок в разделе резюме
+        if (CREATE_RESUME.equals(text)) {
+            // Запускаем процесс создания резюме
+            StateMachine<ResumeState, ResumeEvent> resumeMachine = 
+                stateMachineManager.getResumeStateMachine(chatId);
+            resumeMachine.sendEvent(ResumeEvent.CREATE_RESUME);
+            
+            // Запускаем форму создания резюме
+            FormState formState = stateMachineManager.getCurrentFormState(chatId);
+            if (formState == null || formState == FormState.FORM_IDLE) {
+                StateMachine<FormState, FormEvent> formMachine = 
+                    stateMachineManager.getFormStateMachine(chatId);
+                formMachine.sendEvent(FormEvent.START_CREATION);
+                
+                // Запрашиваем первое поле формы
+                return SendMessage.builder()
+                    .chatId(chatId.toString())
+                    .text("👤 Введите ваше ФИО:")
+                    .replyMarkup(keyboardService.createFormNavigationKeyboard())
+                    .build();
+            }
+        }
+        
+        if (BACK.equals(text)) {
+            // Возвращаемся в главное меню
+            StateMachine<MenuState, MenuEvent> menuMachine = stateMachineManager.getMenuStateMachine(chatId);
+            menuMachine.sendEvent(MenuEvent.BACK);
+            return showMainMenu(chatId);
+        }
+        
+        // Если резюме существует и нажата кнопка "✏️ Редактировать"
+        if (EDIT_RESUME.equals(text)) {
+            // TODO: Реализовать редактирование резюме
+            return showMainMenu(chatId);
+        }
+        
+        // По умолчанию показываем раздел резюме
         return enterResumeSection(chatId);
     }
 
     public BotApiMethod<?> handleVacanciesSection(Long chatId, String text) {
-        return showVacanciesMenu(chatId);
+        // Обработка кнопки "Назад" в разделе вакансий
+        if (BACK.equals(text)) {
+            StateMachine<MenuState, MenuEvent> menuMachine = stateMachineManager.getMenuStateMachine(chatId);
+            menuMachine.sendEvent(MenuEvent.BACK);
+            return showMainMenu(chatId);
+        }
+        
+        // Обработка других кнопок в разделе вакансий
+        // TODO: Добавить обработку "🔍 Поиск вакансий" и "📋 Мои отклики"
+        
+        return keyboardService.showVacanciesMenu(chatId);
     }
 
-    public BotApiMethod<?> showVacanciesMenu(Long chatId) {
-        ReplyKeyboardMarkup keyboard = new ReplyKeyboardMarkup();
-        keyboard.setResizeKeyboard(true);
 
-        List<KeyboardRow> rows = new ArrayList<>();
-        KeyboardRow row1 = new KeyboardRow();
-        row1.add("🔍 Поиск вакансий");
-        rows.add(row1);
 
-        KeyboardRow row2 = new KeyboardRow();
-        row2.add("📋 Мои отклики");
-        rows.add(row2);
-
-        KeyboardRow row3 = new KeyboardRow();
-        row3.add("↩️ Назад");
-        rows.add(row3);
-
-        keyboard.setKeyboard(rows);
-
-        return SendMessage.builder()
-                .chatId(chatId.toString())
-                .text("💼 Раздел вакансий:")
-                .replyMarkup(keyboard)
-                .build();
-    }
-
-    public BotApiMethod<?> showSettings(Long chatId) {
-        ReplyKeyboardMarkup keyboard = new ReplyKeyboardMarkup();
-        keyboard.setResizeKeyboard(true);
-
-        List<KeyboardRow> rows = new ArrayList<>();
-        KeyboardRow row1 = new KeyboardRow();
-        row1.add("⚙️ Настройки профиля");
-        rows.add(row1);
-
-        KeyboardRow row2 = new KeyboardRow();
-        row2.add("🔔 Уведомления");
-        rows.add(row2);
-
-        KeyboardRow row3 = new KeyboardRow();
-        row3.add("↩️ Назад");
-        rows.add(row3);
-
-        keyboard.setKeyboard(rows);
-
-        return SendMessage.builder()
-                .chatId(chatId.toString())
-                .text("⚙️ Настройки:")
-                .replyMarkup(keyboard)
-                .build();
+    public BotApiMethod<?> handleSettingsSection(Long chatId, String text) {
+        // Обработка кнопки "Назад" в разделе настроек
+        if (BACK.equals(text)) {
+            StateMachine<MenuState, MenuEvent> menuMachine = stateMachineManager.getMenuStateMachine(chatId);
+            menuMachine.sendEvent(MenuEvent.BACK);
+            return showMainMenu(chatId);
+        }
+        
+        // Обработка других кнопок в разделе настроек
+        // TODO: Добавить обработку "⚙️ Настройки профиля" и "🔔 Уведомления"
+        
+        return keyboardService.showSettings(chatId);
     }
 
     public BotApiMethod<?> showResumeCreationPrompt(Long chatId) {
@@ -164,11 +182,11 @@ public class NavigationHandler {
 
         List<KeyboardRow> rows = new ArrayList<>();
         KeyboardRow row1 = new KeyboardRow();
-        row1.add("✅ Создать резюме");
+        row1.add(CREATE_RESUME);
         rows.add(row1);
 
         KeyboardRow row2 = new KeyboardRow();
-        row2.add("↩️ Назад");
+        row2.add(BACK);
         rows.add(row2);
 
         keyboard.setKeyboard(rows);
@@ -205,11 +223,11 @@ public class NavigationHandler {
 
         List<KeyboardRow> rows = new ArrayList<>();
         KeyboardRow row1 = new KeyboardRow();
-        row1.add("✏️ Редактировать");
+        row1.add(EDIT_RESUME);
         rows.add(row1);
 
         KeyboardRow row2 = new KeyboardRow();
-        row2.add("↩️ Назад");
+        row2.add(BACK);
         rows.add(row2);
 
         keyboard.setKeyboard(rows);
@@ -241,31 +259,11 @@ public class NavigationHandler {
             // Сбрасываем состояние
             stateMachineManager.cleanupUserSession(chatId);
         }
-
-        ReplyKeyboardMarkup keyboard = createMainMenuKeyboard();
+        ReplyKeyboardMarkup keyboard = keyboardService.createMainMenuKeyboard();
         return SendMessage.builder()
                 .chatId(chatId.toString())
                 .text("Главное меню:")
                 .replyMarkup(keyboard)
                 .build();
-    }
-
-    private ReplyKeyboardMarkup createMainMenuKeyboard() {
-        ReplyKeyboardMarkup keyboard = new ReplyKeyboardMarkup();
-        keyboard.setResizeKeyboard(true);
-
-        List<KeyboardRow> rows = new ArrayList<>();
-        KeyboardRow row1 = new KeyboardRow();
-        row1.add("📄 Моё резюме");
-        row1.add("💼 Вакансии");
-        rows.add(row1);
-
-        KeyboardRow row2 = new KeyboardRow();
-        row2.add("🔍 Поиск");
-        row2.add("⚙️ Настройки");
-        rows.add(row2);
-
-        keyboard.setKeyboard(rows);
-        return keyboard;
     }
 }

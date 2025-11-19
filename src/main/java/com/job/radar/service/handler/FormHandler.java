@@ -4,6 +4,7 @@ import com.job.radar.model.enums.statemachine.event.FormEvent;
 import com.job.radar.model.enums.statemachine.state.FormState;
 import com.job.radar.service.ResumeService;
 import com.job.radar.service.StateMachineManager;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.statemachine.StateMachine;
 import org.springframework.stereotype.Service;
 import org.telegram.telegrambots.meta.api.methods.BotApiMethod;
@@ -14,6 +15,9 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.Keyboard
 import java.util.ArrayList;
 import java.util.List;
 
+import static com.job.radar.utils.ButtonConsts.*;
+
+@Slf4j
 @SuppressWarnings("deprecation")
 @Service
 public class FormHandler {
@@ -34,42 +38,41 @@ public class FormHandler {
         StateMachine<FormState, FormEvent> formMachine = stateMachineManager.getFormStateMachine(chatId);
         FormState currentState = formMachine.getState().getId();
 
-        // Обработка специальных команд
-        if ("/skip".equals(text)) {
+        log.info("handleFormStep text: {}", text);
+
+        // Обработка кнопок навигации
+        if (CMD_SKIP.equals(text) || SKIP.equals(text)) {
             formMachine.sendEvent(FormEvent.SKIP);
             return askNextQuestion(chatId);
         }
 
-        if ("/back".equals(text)) {
+        if (CMD_BACK.equals(text) || BACK.equals(text)) {
             formMachine.sendEvent(FormEvent.PREVIOUS);
             return askPreviousQuestion(chatId);
         }
+        
+        if (CANCEL.equals(text) || CMD_CANCEL.equals(text)) {
+            formMachine.sendEvent(FormEvent.CANCEL);
+            stateMachineManager.cleanupFormMachine(chatId);
+            return SendMessage.builder()
+                    .chatId(chatId.toString())
+                    .text("❌ Заполнение формы отменено.")
+                    .build();
+        }
 
         // Обработка по текущему состоянию
-        switch (currentState) {
-            case ENTERING_FULL_NAME:
-                return processFullName(chatId, text, formMachine);
-
-            case ENTERING_EMAIL:
-                return processEmail(chatId, text, formMachine);
-
-            case ENTERING_PHONE:
-                return processPhone(chatId, text, formMachine);
-
-            case ENTERING_AGE:
-                return processAge(chatId, text, formMachine);
-
-            case ENTERING_CITY:
-                return processCity(chatId, text, formMachine);
+        return switch (currentState) {
+            case ENTERING_FULL_NAME -> processFullName(chatId, text, formMachine);
+            case ENTERING_EMAIL -> processEmail(chatId, text, formMachine);
+            case ENTERING_PHONE -> processPhone(chatId, text, formMachine);
+            case ENTERING_AGE -> processAge(chatId, text, formMachine);
+            case ENTERING_CITY -> processCity(chatId, text, formMachine);
 
             // ... обработка остальных полей
 
-            case CONFIRMING_FORM:
-                return processConfirmation(chatId, text, formMachine);
-
-            default:
-                return null;
-        }
+            case CONFIRMING_FORM -> processConfirmation(chatId, text, formMachine);
+            default -> null;
+        };
     }
 
     private BotApiMethod<?> processFullName(Long chatId, String text,
@@ -129,12 +132,12 @@ public class FormHandler {
 
         List<KeyboardRow> rows = new ArrayList<>();
         KeyboardRow row1 = new KeyboardRow();
-        row1.add("⏭️ Пропустить");
-        row1.add("↩️ Назад");
+        row1.add(SKIP);
+        row1.add(BACK);
         rows.add(row1);
 
         KeyboardRow row2 = new KeyboardRow();
-        row2.add("❌ Отмена");
+        row2.add(CANCEL);
         rows.add(row2);
 
         keyboard.setKeyboard(rows);
@@ -255,13 +258,13 @@ public class FormHandler {
     }
 
     public BotApiMethod<?> processConfirmation(Long chatId, String text, StateMachine<FormState, FormEvent> formMachine) {
-        if ("✅ Подтвердить".equals(text) || "Подтвердить".equals(text)) {
+        if (CONFIRM.equals(text) || CONFIRM_TEXT.equals(text)) {
             formMachine.sendEvent(FormEvent.CONFIRM);
             return SendMessage.builder()
                     .chatId(chatId.toString())
                     .text("✅ Форма успешно сохранена!")
                     .build();
-        } else if ("❌ Отмена".equals(text) || "Отмена".equals(text)) {
+        } else if (CANCEL.equals(text) || CANCEL_TEXT.equals(text)) {
             formMachine.sendEvent(FormEvent.CANCEL);
             return SendMessage.builder()
                     .chatId(chatId.toString())

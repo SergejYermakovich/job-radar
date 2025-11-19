@@ -47,9 +47,10 @@ public class UpdateProcessorService {
         Long chatId = update.getMessage().getChatId();
         String text = update.getMessage().getText();
 
-        // Check if user is in form flow
+        log.info("text update: {}", text);
         if (stateMachineManager.isInFormFlow(chatId)) {
             FormState formState = stateMachineManager.getCurrentFormState(chatId);
+            log.info("isInFormFlow state: {}, chat = {}", formState, chatId);
             if (formState != null && formState != FormState.FORM_IDLE && formState != FormState.FORM_COMPLETED) {
                 return formHandler.handleFormStep(chatId, text);
             }
@@ -57,7 +58,9 @@ public class UpdateProcessorService {
 
         // Check if user is in resume creation flow
         ResumeState resumeState = stateMachineManager.getCurrentResumeState(chatId);
-        if (resumeState != null && resumeState == ResumeState.RESUME_CREATE) {
+
+        log.info("resume state: {}, chat = {}", resumeState, chatId);
+        if (resumeState == ResumeState.RESUME_CREATE) {
             return resumeFormHandler.processResumeStep(chatId, text);
         }
 

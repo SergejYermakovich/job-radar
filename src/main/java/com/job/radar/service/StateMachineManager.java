@@ -7,6 +7,7 @@ import com.job.radar.model.enums.statemachine.state.FormState;
 import com.job.radar.model.enums.statemachine.state.MenuState;
 import com.job.radar.model.enums.statemachine.state.ResumeState;
 import jakarta.annotation.Resource;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.statemachine.StateMachine;
 import org.springframework.statemachine.config.StateMachineFactory;
 import org.springframework.stereotype.Service;
@@ -14,6 +15,7 @@ import org.springframework.stereotype.Service;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+@Slf4j
 @Service
 public class StateMachineManager {
     @Resource(name = "menuStateMachine")
@@ -76,6 +78,7 @@ public class StateMachineManager {
 
     public boolean isInFormFlow(Long chatId) {
         FormState currentState = getCurrentFormState(chatId);
+        log.info("isInFormFlow currentState: {}", currentState);
         return currentState != null &&
                 currentState != FormState.FORM_IDLE &&
                 currentState != FormState.FORM_COMPLETED &&
@@ -102,7 +105,6 @@ public class StateMachineManager {
     }
 
     public void cleanupUserSession(Long chatId) {
-        // Очищаем все State Machines пользователя
         cleanupStateMachine(menuMachines, chatId);
         cleanupStateMachine(resumeMachines, chatId);
         cleanupStateMachine(formMachines, chatId);

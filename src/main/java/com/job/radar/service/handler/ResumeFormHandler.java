@@ -9,6 +9,8 @@ import org.springframework.stereotype.Service;
 import org.telegram.telegrambots.meta.api.methods.BotApiMethod;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 
+import static com.job.radar.utils.ButtonConsts.*;
+
 @SuppressWarnings("deprecation")
 @Service
 public class ResumeFormHandler {
@@ -28,7 +30,7 @@ public class ResumeFormHandler {
 
         switch (currentState) {
             case RESUME_VIEW:
-                if ("✅ Создать резюме".equals(text)) {
+                if (CREATE_RESUME.equals(text)) {
                     resumeMachine.sendEvent(ResumeEvent.CREATE_RESUME);
                     return askForFullName(chatId);
                 }
@@ -94,14 +96,14 @@ public class ResumeFormHandler {
     }
 
     public BotApiMethod<?> processResumeConfirmation(Long chatId, String text) {
-        if ("✅ Подтвердить".equals(text) || "Подтвердить".equals(text)) {
+        if (CONFIRM.equals(text) || CONFIRM_TEXT.equals(text)) {
             StateMachine<ResumeState, ResumeEvent> resumeMachine = stateMachineManager.getResumeStateMachine(chatId);
             resumeMachine.sendEvent(ResumeEvent.COMPLETE);
             return SendMessage.builder()
                     .chatId(chatId.toString())
                     .text("✅ Резюме успешно сохранено!")
                     .build();
-        } else if ("❌ Отмена".equals(text) || "Отмена".equals(text)) {
+        } else if (CANCEL.equals(text) || CANCEL_TEXT.equals(text)) {
             StateMachine<ResumeState, ResumeEvent> resumeMachine = stateMachineManager.getResumeStateMachine(chatId);
             resumeMachine.sendEvent(ResumeEvent.CANCEL);
             return SendMessage.builder()
