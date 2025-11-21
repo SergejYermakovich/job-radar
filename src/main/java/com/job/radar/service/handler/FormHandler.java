@@ -18,14 +18,12 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static com.job.radar.utils.ButtonConsts.*;
-import static com.job.radar.utils.FieldNames.EMAIL;
-import static com.job.radar.utils.FieldNames.FULL_NAME;
+import static com.job.radar.utils.FieldNames.*;
 
 @Slf4j
 @SuppressWarnings("deprecation")
 @Service
 public class FormHandler {
-
     private final StateMachineManager stateMachineManager;
     private final ResumeService resumeService;
     private final KeyboardService keyboardService;
@@ -197,12 +195,15 @@ public class FormHandler {
                     .build();
         }
 
-        saveFormField(chatId, "phone", text);
+        saveFormField(chatId, PHONE, text);
         formMachine.sendEvent(FormEvent.NEXT);
         return askForAge(chatId);
     }
 
-    public BotApiMethod<?> processAge(Long chatId, String text, StateMachine<FormState, FormEvent> formMachine) {
+    public BotApiMethod<?> processAge(Long chatId,
+                                      String text,
+                                      StateMachine<FormState, FormEvent> formMachine
+    ) {
         try {
             int age = Integer.parseInt(text);
             if (age < 14 || age > 100) {
@@ -222,7 +223,9 @@ public class FormHandler {
         }
     }
 
-    public BotApiMethod<?> processCity(Long chatId, String text, StateMachine<FormState, FormEvent> formMachine) {
+    public BotApiMethod<?> processCity(Long chatId,
+                                       String text,
+                                       StateMachine<FormState, FormEvent> formMachine) {
         if (text == null || text.trim().length() < 2) {
             return SendMessage.builder()
                     .chatId(chatId.toString())
@@ -230,7 +233,7 @@ public class FormHandler {
                     .build();
         }
 
-        saveFormField(chatId, "city", text);
+        saveFormField(chatId, CITY, text);
         formMachine.sendEvent(FormEvent.NEXT);
         return SendMessage.builder()
                 .chatId(chatId.toString())
@@ -239,7 +242,9 @@ public class FormHandler {
                 .build();
     }
 
-    public BotApiMethod<?> processConfirmation(Long chatId, String text, StateMachine<FormState, FormEvent> formMachine) {
+    public BotApiMethod<?> processConfirmation(Long chatId,
+                                               String text,
+                                               StateMachine<FormState, FormEvent> formMachine) {
         if (CONFIRM.equals(text) || CONFIRM_TEXT.equals(text)) {
             formMachine.sendEvent(FormEvent.CONFIRM);
             return SendMessage.builder()

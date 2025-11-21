@@ -10,6 +10,7 @@ import org.telegram.telegrambots.meta.api.methods.BotApiMethod;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 
 import static com.job.radar.utils.ButtonConsts.*;
+import static com.job.radar.utils.FieldNames.EMAIL;
 import static com.job.radar.utils.FieldNames.FULL_NAME;
 
 @SuppressWarnings("deprecation")
@@ -36,16 +37,12 @@ public class ResumeFormHandler {
                     return askForFullName(chatId);
                 }
                 break;
-
             case RESUME_CREATE:
                 return processFullName(chatId, text);
-
             case RESUME_EDIT:
                 return processEmail(chatId, text);
-
             case RESUME_COMPLETED:
                 return processResumeConfirmation(chatId, text);
-
             default:
                 break;
         }
@@ -86,7 +83,7 @@ public class ResumeFormHandler {
                     .build();
         }
 
-        resumeService.createOrUpdate(chatId, "email", text);
+        resumeService.createOrUpdate(chatId, EMAIL, text);
         StateMachine<ResumeState, ResumeEvent> resumeMachine = stateMachineManager.getResumeStateMachine(chatId);
         resumeMachine.sendEvent(ResumeEvent.COMPLETE);
 

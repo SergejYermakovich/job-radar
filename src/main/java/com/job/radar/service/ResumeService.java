@@ -9,8 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
 
-import static com.job.radar.utils.FieldNames.EMAIL;
-import static com.job.radar.utils.FieldNames.FULL_NAME;
+import static com.job.radar.utils.FieldNames.*;
 
 @Slf4j
 @Service
@@ -41,16 +40,16 @@ public class ResumeService {
         switch (field) {
             case FULL_NAME -> resume.setFullName(value);
             case EMAIL -> resume.setEmail(value);
-            case "phone" -> resume.setPhone(value);
-            case "city" -> resume.setCity(value);
-            case "position" -> resume.setPosition(value);
-            case "experience" -> resume.setExperience(value);
-            case "skills" -> resume.setSkills(value);
-            case "employmentType" -> resume.setEmploymentType(value);
-            case "education" -> resume.setEducation(value);
-            case "languages" -> resume.setLanguages(value);
-            case "portfolio" -> resume.setPortfolio(value);
-            case "about" -> resume.setAbout(value);
+            case PHONE -> resume.setPhone(value);
+            case CITY -> resume.setCity(value);
+            case POSITION -> resume.setPosition(value);
+            case EXPERIENCE -> resume.setExperience(value);
+            case SKILLS -> resume.setSkills(value);
+            case EMPLOYMENT_TYPE -> resume.setEmploymentType(value);
+            case EDUCATION -> resume.setEducation(value);
+            case LANGUAGES -> resume.setLanguages(value);
+            case PORTFOLIO -> resume.setPortfolio(value);
+            case ABOUT -> resume.setAbout(value);
             default -> log.warn("Unknown field: {}", field);
         }
 
