@@ -4,6 +4,7 @@ import com.job.radar.model.enums.statemachine.event.ResumeEvent;
 import com.job.radar.model.enums.statemachine.state.ResumeState;
 import com.job.radar.service.ResumeService;
 import com.job.radar.service.StateMachineManager;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.statemachine.StateMachine;
 import org.springframework.stereotype.Service;
 import org.telegram.telegrambots.meta.api.methods.BotApiMethod;
@@ -13,6 +14,7 @@ import static com.job.radar.utils.ButtonConsts.*;
 import static com.job.radar.utils.FieldNames.EMAIL;
 import static com.job.radar.utils.FieldNames.FULL_NAME;
 
+@Slf4j
 @SuppressWarnings("deprecation")
 @Service
 public class ResumeFormHandler {
@@ -51,6 +53,7 @@ public class ResumeFormHandler {
     }
 
     public BotApiMethod<?> askForFullName(Long chatId) {
+        log.info("ResumeFormHandler - askForFullName ....");
         return SendMessage.builder()
                 .chatId(chatId.toString())
                 .text("👤 Введите ваше ФИО для резюме:")

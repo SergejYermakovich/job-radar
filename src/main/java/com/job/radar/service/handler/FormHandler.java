@@ -2,6 +2,7 @@ package com.job.radar.service.handler;
 
 import com.job.radar.model.enums.statemachine.event.FormEvent;
 import com.job.radar.model.enums.statemachine.state.FormState;
+import com.job.radar.service.AskService;
 import com.job.radar.service.KeyboardService;
 import com.job.radar.service.ResumeService;
 import com.job.radar.service.StateMachineManager;
@@ -27,13 +28,16 @@ public class FormHandler {
     private final StateMachineManager stateMachineManager;
     private final ResumeService resumeService;
     private final KeyboardService keyboardService;
+    private final AskService askService;
 
     public FormHandler(StateMachineManager stateMachineManager,
                        ResumeService resumeService,
-                       KeyboardService keyboardService) {
+                       KeyboardService keyboardService,
+                       AskService askService) {
         this.stateMachineManager = stateMachineManager;
         this.resumeService = resumeService;
         this.keyboardService = keyboardService;
+        this.askService = askService;
     }
 
     public BotApiMethod<?> handleFormStep(Long chatId, String text) {
@@ -94,16 +98,9 @@ public class FormHandler {
         formMachine.sendEvent(FormEvent.NEXT);
 
         // Запрашиваем следующий вопрос
-        return askForEmail(chatId);
+        return askService.askForEmail(chatId);
     }
 
-    private BotApiMethod<?> askForEmail(Long chatId) {
-        return SendMessage.builder()
-                .chatId(chatId.toString())
-                .text("📧 Введите ваш email:")
-                .replyMarkup(keyboardService.createFormNavigationKeyboard())
-                .build();
-    }
 
     private BotApiMethod<?> processEmail(Long chatId, String text,
                                          StateMachine<FormState, FormEvent> formMachine) {
@@ -117,15 +114,7 @@ public class FormHandler {
         saveFormField(chatId, EMAIL, text);
         formMachine.sendEvent(FormEvent.NEXT);
 
-        return askForPhone(chatId);
-    }
-
-    private BotApiMethod<?> askForPhone(Long chatId) {
-        return SendMessage.builder()
-                .chatId(chatId.toString())
-                .text("📱 Введите ваш номер телефона:")
-                .replyMarkup(keyboardService.createFormNavigationKeyboard())
-                .build();
+        return askService.askForPhone(chatId);
     }
 
     private void saveFormField(Long chatId, String field, String value) {
@@ -141,11 +130,11 @@ public class FormHandler {
         FormState currentState = formMachine.getState().getId();
 
         return switch (currentState) {
-            case ENTERING_FULL_NAME -> askForFullName(chatId);
-            case ENTERING_EMAIL -> askForEmail(chatId);
-            case ENTERING_PHONE -> askForPhone(chatId);
-            case ENTERING_AGE -> askForAge(chatId);
-            case ENTERING_CITY -> askForCity(chatId);
+            case ENTERING_FULL_NAME -> askService.askForFullName(chatId);
+            case ENTERING_EMAIL -> askService.askForEmail(chatId);
+            case ENTERING_PHONE -> askService.askForPhone(chatId);
+            case ENTERING_AGE -> askService.askForAge(chatId);
+            case ENTERING_CITY -> askService.askForCity(chatId);
             default -> null;
         };
     }
@@ -155,37 +144,15 @@ public class FormHandler {
         FormState currentState = formMachine.getState().getId();
 
         return switch (currentState) {
-            case ENTERING_EMAIL -> askForFullName(chatId);
-            case ENTERING_PHONE -> askForEmail(chatId);
-            case ENTERING_AGE -> askForPhone(chatId);
-            case ENTERING_CITY -> askForAge(chatId);
+            case ENTERING_EMAIL -> askService.askForFullName(chatId);
+            case ENTERING_PHONE -> askService.askForEmail(chatId);
+            case ENTERING_AGE -> askService.askForPhone(chatId);
+            case ENTERING_CITY -> askService.askForAge(chatId);
             default -> null;
         };
     }
 
-    private BotApiMethod<?> askForFullName(Long chatId) {
-        return SendMessage.builder()
-                .chatId(chatId.toString())
-                .text("👤 Введите ваше ФИО:")
-                .replyMarkup(keyboardService.createFormNavigationKeyboard())
-                .build();
-    }
 
-    private BotApiMethod<?> askForAge(Long chatId) {
-        return SendMessage.builder()
-                .chatId(chatId.toString())
-                .text("🎂 Введите ваш возраст:")
-                .replyMarkup(keyboardService.createFormNavigationKeyboard())
-                .build();
-    }
-
-    private BotApiMethod<?> askForCity(Long chatId) {
-        return SendMessage.builder()
-                .chatId(chatId.toString())
-                .text("🏙️ Введите ваш город:")
-                .replyMarkup(keyboardService.createFormNavigationKeyboard())
-                .build();
-    }
 
     public BotApiMethod<?> processPhone(Long chatId, String text, StateMachine<FormState, FormEvent> formMachine) {
         if (text == null || text.trim().isEmpty()) {
@@ -197,7 +164,7 @@ public class FormHandler {
 
         saveFormField(chatId, PHONE, text);
         formMachine.sendEvent(FormEvent.NEXT);
-        return askForAge(chatId);
+        return askService.askForAge(chatId);
     }
 
     public BotApiMethod<?> processAge(Long chatId,
@@ -214,7 +181,7 @@ public class FormHandler {
             }
             saveFormField(chatId, "age", age);
             formMachine.sendEvent(FormEvent.NEXT);
-            return askForCity(chatId);
+            return askService.askForCity(chatId);
         } catch (NumberFormatException e) {
             return SendMessage.builder()
                     .chatId(chatId.toString())
