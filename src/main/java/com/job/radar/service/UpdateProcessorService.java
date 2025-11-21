@@ -58,7 +58,6 @@ public class UpdateProcessorService {
 
         // Check if user is in resume creation flow
         ResumeState resumeState = stateMachineManager.getCurrentResumeState(chatId);
-
         log.info("resume state: {}, chat = {}", resumeState, chatId);
         if (resumeState == ResumeState.RESUME_CREATE) {
             return resumeFormHandler.processResumeStep(chatId, text);

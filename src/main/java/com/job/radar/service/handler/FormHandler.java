@@ -2,8 +2,10 @@ package com.job.radar.service.handler;
 
 import com.job.radar.model.enums.statemachine.event.FormEvent;
 import com.job.radar.model.enums.statemachine.state.FormState;
+import com.job.radar.service.KeyboardService;
 import com.job.radar.service.ResumeService;
 import com.job.radar.service.StateMachineManager;
+import com.job.radar.utils.ResumeFieldValidators;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.statemachine.StateMachine;
 import org.springframework.stereotype.Service;
@@ -16,6 +18,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static com.job.radar.utils.ButtonConsts.*;
+import static com.job.radar.utils.FieldNames.EMAIL;
+import static com.job.radar.utils.FieldNames.FULL_NAME;
 
 @Slf4j
 @SuppressWarnings("deprecation")
@@ -24,14 +28,14 @@ public class FormHandler {
 
     private final StateMachineManager stateMachineManager;
     private final ResumeService resumeService;
-    private final MessageSender messageSender;
+    private final KeyboardService keyboardService;
 
     public FormHandler(StateMachineManager stateMachineManager,
                        ResumeService resumeService,
-                       MessageSender messageSender) {
+                       KeyboardService keyboardService) {
         this.stateMachineManager = stateMachineManager;
         this.resumeService = resumeService;
-        this.messageSender = messageSender;
+        this.keyboardService = keyboardService;
     }
 
     public BotApiMethod<?> handleFormStep(Long chatId, String text) {
@@ -86,7 +90,7 @@ public class FormHandler {
         }
 
         // Сохраняем значение (временное хранение)
-        saveFormField(chatId, "fullName", text);
+        saveFormField(chatId, FULL_NAME, text);
 
         // Переходим к следующему шагу
         formMachine.sendEvent(FormEvent.NEXT);
@@ -99,20 +103,20 @@ public class FormHandler {
         return SendMessage.builder()
                 .chatId(chatId.toString())
                 .text("📧 Введите ваш email:")
-                .replyMarkup(createFormNavigationKeyboard())
+                .replyMarkup(keyboardService.createFormNavigationKeyboard())
                 .build();
     }
 
     private BotApiMethod<?> processEmail(Long chatId, String text,
                                          StateMachine<FormState, FormEvent> formMachine) {
-        if (!isValidEmail(text)) {
+        if (!ResumeFieldValidators.isValidEmail(text)) {
             return SendMessage.builder()
                     .chatId(chatId.toString())
                     .text("❌ Неверный формат email. Попробуйте еще раз:")
                     .build();
         }
 
-        saveFormField(chatId, "email", text);
+        saveFormField(chatId, EMAIL, text);
         formMachine.sendEvent(FormEvent.NEXT);
 
         return askForPhone(chatId);
@@ -122,30 +126,8 @@ public class FormHandler {
         return SendMessage.builder()
                 .chatId(chatId.toString())
                 .text("📱 Введите ваш номер телефона:")
-                .replyMarkup(createFormNavigationKeyboard())
+                .replyMarkup(keyboardService.createFormNavigationKeyboard())
                 .build();
-    }
-
-    private ReplyKeyboardMarkup createFormNavigationKeyboard() {
-        ReplyKeyboardMarkup keyboard = new ReplyKeyboardMarkup();
-        keyboard.setResizeKeyboard(true);
-
-        List<KeyboardRow> rows = new ArrayList<>();
-        KeyboardRow row1 = new KeyboardRow();
-        row1.add(SKIP);
-        row1.add(BACK);
-        rows.add(row1);
-
-        KeyboardRow row2 = new KeyboardRow();
-        row2.add(CANCEL);
-        rows.add(row2);
-
-        keyboard.setKeyboard(rows);
-        return keyboard;
-    }
-
-    private boolean isValidEmail(String email) {
-        return email.matches("^[A-Za-z0-9+_.-]+@(.+)$");
     }
 
     private void saveFormField(Long chatId, String field, String value) {
@@ -187,7 +169,7 @@ public class FormHandler {
         return SendMessage.builder()
                 .chatId(chatId.toString())
                 .text("👤 Введите ваше ФИО:")
-                .replyMarkup(createFormNavigationKeyboard())
+                .replyMarkup(keyboardService.createFormNavigationKeyboard())
                 .build();
     }
 
@@ -195,7 +177,7 @@ public class FormHandler {
         return SendMessage.builder()
                 .chatId(chatId.toString())
                 .text("🎂 Введите ваш возраст:")
-                .replyMarkup(createFormNavigationKeyboard())
+                .replyMarkup(keyboardService.createFormNavigationKeyboard())
                 .build();
     }
 
@@ -203,7 +185,7 @@ public class FormHandler {
         return SendMessage.builder()
                 .chatId(chatId.toString())
                 .text("🏙️ Введите ваш город:")
-                .replyMarkup(createFormNavigationKeyboard())
+                .replyMarkup(keyboardService.createFormNavigationKeyboard())
                 .build();
     }
 
@@ -253,7 +235,7 @@ public class FormHandler {
         return SendMessage.builder()
                 .chatId(chatId.toString())
                 .text("✅ Форма заполнена! Нажмите 'Подтвердить' для сохранения.")
-                .replyMarkup(createFormNavigationKeyboard())
+                .replyMarkup(keyboardService.createFormNavigationKeyboard())
                 .build();
     }
 

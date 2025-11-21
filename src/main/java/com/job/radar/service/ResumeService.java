@@ -9,6 +9,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
 
+import static com.job.radar.utils.FieldNames.EMAIL;
+import static com.job.radar.utils.FieldNames.FULL_NAME;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -36,8 +39,8 @@ public class ResumeService {
         Resume resume = existingResume.orElse(Resume.builder().chatId(chatId).build());
 
         switch (field) {
-            case "fullName" -> resume.setFullName(value);
-            case "email" -> resume.setEmail(value);
+            case FULL_NAME -> resume.setFullName(value);
+            case EMAIL -> resume.setEmail(value);
             case "phone" -> resume.setPhone(value);
             case "city" -> resume.setCity(value);
             case "position" -> resume.setPosition(value);

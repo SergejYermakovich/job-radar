@@ -10,6 +10,7 @@ import org.telegram.telegrambots.meta.api.methods.BotApiMethod;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 
 import static com.job.radar.utils.ButtonConsts.*;
+import static com.job.radar.utils.FieldNames.FULL_NAME;
 
 @SuppressWarnings("deprecation")
 @Service
@@ -67,7 +68,7 @@ public class ResumeFormHandler {
                     .build();
         }
 
-        resumeService.createOrUpdate(chatId, "fullName", text);
+        resumeService.createOrUpdate(chatId, FULL_NAME, text);
         StateMachine<ResumeState, ResumeEvent> resumeMachine = stateMachineManager.getResumeStateMachine(chatId);
         resumeMachine.sendEvent(ResumeEvent.COMPLETE);
 
