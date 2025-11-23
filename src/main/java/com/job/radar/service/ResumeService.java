@@ -62,8 +62,8 @@ public class ResumeService {
         Resume resume = existingResume.orElse(Resume.builder().chatId(chatId).build());
 
         switch (field) {
-            case "age" -> resume.setAge(value);
-            case "salary" -> resume.setSalary(value);
+            case AGE -> resume.setAge(value);
+            case SALARY -> resume.setSalary(value);
             default -> log.warn("Unknown field: {}", field);
         }
 

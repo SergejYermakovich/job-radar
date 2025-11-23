@@ -16,4 +16,6 @@ public class FieldNames {
     public static final String LANGUAGES = "languages";
     public static final String PORTFOLIO = "portfolio";
     public static final String ABOUT = "about";
+    public static final String AGE = "age";
+    public static final String SALARY = "salary";
 }

@@ -10,31 +10,24 @@ import org.springframework.stereotype.Service;
 import org.telegram.telegrambots.meta.api.methods.BotApiMethod;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 
-import static com.job.radar.utils.FieldNames.FULL_NAME;
-
+import static com.job.radar.utils.FieldNames.PHONE;
 @AllArgsConstructor
 @Service
-public class FullNameProcessor implements ResumeFieldProcessor {
+public class PhoneProcessor implements ResumeFieldProcessor {
     private final ResumeService resumeService;
     private final AskService askService;
 
     @Override
-    public BotApiMethod<?> process(Long chatId, String text,
-                                            StateMachine<FormState, FormEvent> formMachine) {
-        if (text.length() < 2) {
+    public BotApiMethod<?> process(Long chatId, String text, StateMachine<FormState, FormEvent> formMachine) {
+        if (text == null || text.trim().isEmpty()) {
             return SendMessage.builder()
                     .chatId(chatId.toString())
-                    .text("❌ ФИО должно содержать минимум 2 символа. Попробуйте еще раз:")
+                    .text("❌ Номер телефона не может быть пустым. Попробуйте еще раз:")
                     .build();
         }
 
-        // Сохраняем значение (временное хранение)
-        resumeService.createOrUpdate(chatId, FULL_NAME, text);
-
-        // Переходим к следующему шагу
+        resumeService.createOrUpdate(chatId, PHONE, text);
         formMachine.sendEvent(FormEvent.NEXT);
-
-        // Запрашиваем следующий вопрос
-        return askService.askForEmail(chatId);
+        return askService.askForAge(chatId);
     }
 }

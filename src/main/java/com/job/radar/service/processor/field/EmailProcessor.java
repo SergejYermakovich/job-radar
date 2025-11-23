@@ -4,37 +4,34 @@ import com.job.radar.model.enums.statemachine.event.FormEvent;
 import com.job.radar.model.enums.statemachine.state.FormState;
 import com.job.radar.service.AskService;
 import com.job.radar.service.ResumeService;
+import com.job.radar.utils.ResumeFieldValidators;
 import lombok.AllArgsConstructor;
 import org.springframework.statemachine.StateMachine;
 import org.springframework.stereotype.Service;
 import org.telegram.telegrambots.meta.api.methods.BotApiMethod;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 
-import static com.job.radar.utils.FieldNames.FULL_NAME;
+import static com.job.radar.utils.FieldNames.EMAIL;
 
 @AllArgsConstructor
 @Service
-public class FullNameProcessor implements ResumeFieldProcessor {
+public class EmailProcessor implements ResumeFieldProcessor {
     private final ResumeService resumeService;
     private final AskService askService;
 
-    @Override
-    public BotApiMethod<?> process(Long chatId, String text,
-                                            StateMachine<FormState, FormEvent> formMachine) {
-        if (text.length() < 2) {
+    public BotApiMethod<?> process(Long chatId,
+                                         String text,
+                                         StateMachine<FormState, FormEvent> formMachine) {
+        if (!ResumeFieldValidators.isValidEmail(text)) {
             return SendMessage.builder()
                     .chatId(chatId.toString())
-                    .text("❌ ФИО должно содержать минимум 2 символа. Попробуйте еще раз:")
+                    .text("❌ Неверный формат email. Попробуйте еще раз:")
                     .build();
         }
 
-        // Сохраняем значение (временное хранение)
-        resumeService.createOrUpdate(chatId, FULL_NAME, text);
-
-        // Переходим к следующему шагу
+        resumeService.createOrUpdate(chatId, EMAIL, text);
         formMachine.sendEvent(FormEvent.NEXT);
 
-        // Запрашиваем следующий вопрос
-        return askService.askForEmail(chatId);
+        return askService.askForPhone(chatId);
     }
 }

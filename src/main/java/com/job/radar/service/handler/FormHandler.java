@@ -26,17 +26,11 @@ import static com.job.radar.utils.FieldNames.*;
 @Service
 public class FormHandler {
     private final StateMachineManager stateMachineManager;
-    private final ResumeService resumeService;
-    private final KeyboardService keyboardService;
     private final AskService askService;
 
     public FormHandler(StateMachineManager stateMachineManager,
-                       ResumeService resumeService,
-                       KeyboardService keyboardService,
                        AskService askService) {
         this.stateMachineManager = stateMachineManager;
-        this.resumeService = resumeService;
-        this.keyboardService = keyboardService;
         this.askService = askService;
     }
 
@@ -81,50 +75,6 @@ public class FormHandler {
         };
     }
 
-    private BotApiMethod<?> processFullName(Long chatId, String text,
-                                            StateMachine<FormState, FormEvent> formMachine) {
-        // Валидация
-        if (text.length() < 2) {
-            return SendMessage.builder()
-                    .chatId(chatId.toString())
-                    .text("❌ ФИО должно содержать минимум 2 символа. Попробуйте еще раз:")
-                    .build();
-        }
-
-        // Сохраняем значение (временное хранение)
-        saveFormField(chatId, FULL_NAME, text);
-
-        // Переходим к следующему шагу
-        formMachine.sendEvent(FormEvent.NEXT);
-
-        // Запрашиваем следующий вопрос
-        return askService.askForEmail(chatId);
-    }
-
-
-    private BotApiMethod<?> processEmail(Long chatId, String text,
-                                         StateMachine<FormState, FormEvent> formMachine) {
-        if (!ResumeFieldValidators.isValidEmail(text)) {
-            return SendMessage.builder()
-                    .chatId(chatId.toString())
-                    .text("❌ Неверный формат email. Попробуйте еще раз:")
-                    .build();
-        }
-
-        saveFormField(chatId, EMAIL, text);
-        formMachine.sendEvent(FormEvent.NEXT);
-
-        return askService.askForPhone(chatId);
-    }
-
-    private void saveFormField(Long chatId, String field, String value) {
-        resumeService.createOrUpdate(chatId, field, value);
-    }
-
-    private void saveFormField(Long chatId, String field, Integer value) {
-        resumeService.createOrUpdate(chatId, field, value);
-    }
-
     public BotApiMethod<?> askNextQuestion(Long chatId) {
         StateMachine<FormState, FormEvent> formMachine = stateMachineManager.getFormStateMachine(chatId);
         FormState currentState = formMachine.getState().getId();
@@ -150,81 +100,5 @@ public class FormHandler {
             case ENTERING_CITY -> askService.askForAge(chatId);
             default -> null;
         };
-    }
-
-
-
-    public BotApiMethod<?> processPhone(Long chatId, String text, StateMachine<FormState, FormEvent> formMachine) {
-        if (text == null || text.trim().isEmpty()) {
-            return SendMessage.builder()
-                    .chatId(chatId.toString())
-                    .text("❌ Номер телефона не может быть пустым. Попробуйте еще раз:")
-                    .build();
-        }
-
-        saveFormField(chatId, PHONE, text);
-        formMachine.sendEvent(FormEvent.NEXT);
-        return askService.askForAge(chatId);
-    }
-
-    public BotApiMethod<?> processAge(Long chatId,
-                                      String text,
-                                      StateMachine<FormState, FormEvent> formMachine
-    ) {
-        try {
-            int age = Integer.parseInt(text);
-            if (age < 14 || age > 100) {
-                return SendMessage.builder()
-                        .chatId(chatId.toString())
-                        .text("❌ Возраст должен быть от 14 до 100 лет. Попробуйте еще раз:")
-                        .build();
-            }
-            saveFormField(chatId, "age", age);
-            formMachine.sendEvent(FormEvent.NEXT);
-            return askService.askForCity(chatId);
-        } catch (NumberFormatException e) {
-            return SendMessage.builder()
-                    .chatId(chatId.toString())
-                    .text("❌ Введите корректный возраст (число). Попробуйте еще раз:")
-                    .build();
-        }
-    }
-
-    public BotApiMethod<?> processCity(Long chatId,
-                                       String text,
-                                       StateMachine<FormState, FormEvent> formMachine) {
-        if (text == null || text.trim().length() < 2) {
-            return SendMessage.builder()
-                    .chatId(chatId.toString())
-                    .text("❌ Название города должно содержать минимум 2 символа. Попробуйте еще раз:")
-                    .build();
-        }
-
-        saveFormField(chatId, CITY, text);
-        formMachine.sendEvent(FormEvent.NEXT);
-        return SendMessage.builder()
-                .chatId(chatId.toString())
-                .text("✅ Форма заполнена! Нажмите 'Подтвердить' для сохранения.")
-                .replyMarkup(keyboardService.createFormNavigationKeyboard())
-                .build();
-    }
-
-    public BotApiMethod<?> processConfirmation(Long chatId,
-                                               String text,
-                                               StateMachine<FormState, FormEvent> formMachine) {
-        if (CONFIRM.equals(text) || CONFIRM_TEXT.equals(text)) {
-            formMachine.sendEvent(FormEvent.CONFIRM);
-            return SendMessage.builder()
-                    .chatId(chatId.toString())
-                    .text("✅ Форма успешно сохранена!")
-                    .build();
-        } else if (CANCEL.equals(text) || CANCEL_TEXT.equals(text)) {
-            formMachine.sendEvent(FormEvent.CANCEL);
-            return SendMessage.builder()
-                    .chatId(chatId.toString())
-                    .text("❌ Заполнение формы отменено.")
-                    .build();
-        }
-        return null;
     }
 }
