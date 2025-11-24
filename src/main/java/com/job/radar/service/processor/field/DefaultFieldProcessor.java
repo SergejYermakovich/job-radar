@@ -15,4 +15,9 @@ public class DefaultFieldProcessor implements ResumeFieldProcessor {
     ) {
         return null;
     }
+
+    @Override
+    public FormState getCurrentState() {
+        return null;
+    }
 }

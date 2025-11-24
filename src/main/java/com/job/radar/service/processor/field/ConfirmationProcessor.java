@@ -33,4 +33,9 @@ public class ConfirmationProcessor implements ResumeFieldProcessor {
         }
         return null;
     }
+
+    @Override
+    public FormState getCurrentState() {
+        return FormState.CONFIRMING_FORM;
+    }
 }

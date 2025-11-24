@@ -37,4 +37,9 @@ public class FullNameProcessor implements ResumeFieldProcessor {
         // Запрашиваем следующий вопрос
         return askService.askForEmail(chatId);
     }
+
+    @Override
+    public FormState getCurrentState() {
+        return FormState.ENTERING_FULL_NAME;
+    }
 }

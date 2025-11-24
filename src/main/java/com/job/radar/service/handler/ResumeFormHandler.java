@@ -18,7 +18,6 @@ import static com.job.radar.utils.FieldNames.FULL_NAME;
 @SuppressWarnings("deprecation")
 @Service
 public class ResumeFormHandler {
-
     private final StateMachineManager stateMachineManager;
     private final ResumeService resumeService;
 

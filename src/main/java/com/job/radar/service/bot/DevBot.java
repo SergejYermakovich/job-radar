@@ -55,5 +55,6 @@ public class DevBot extends TelegramLongPollingBot {
         log.info("=== JobRadarBot STARTED ===");
         log.info("Bot username: {}", getBotUsername());
         log.info("Bot token: {}", "..." + getBotToken().substring(5, 10) + "...");
+        log.info("===========================");
     }
 }

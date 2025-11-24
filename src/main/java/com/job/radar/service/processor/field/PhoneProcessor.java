@@ -30,4 +30,9 @@ public class PhoneProcessor implements ResumeFieldProcessor {
         formMachine.sendEvent(FormEvent.NEXT);
         return askService.askForAge(chatId);
     }
+
+    @Override
+    public FormState getCurrentState() {
+        return FormState.ENTERING_PHONE;
+    }
 }

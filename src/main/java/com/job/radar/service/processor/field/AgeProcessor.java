@@ -40,4 +40,9 @@ public class AgeProcessor implements ResumeFieldProcessor {
                     .build();
         }
     }
+
+    @Override
+    public FormState getCurrentState() {
+        return FormState.ENTERING_AGE;
+    }
 }

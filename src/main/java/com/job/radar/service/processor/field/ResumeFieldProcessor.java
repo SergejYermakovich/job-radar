@@ -7,4 +7,5 @@ import org.telegram.telegrambots.meta.api.methods.BotApiMethod;
 
 public interface ResumeFieldProcessor {
     BotApiMethod<?>  process(Long chatId, String text, StateMachine<FormState, FormEvent> formMachine);
+    FormState getCurrentState();
 }

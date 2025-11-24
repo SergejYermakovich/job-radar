@@ -34,4 +34,9 @@ public class EmailProcessor implements ResumeFieldProcessor {
 
         return askService.askForPhone(chatId);
     }
+
+    @Override
+    public FormState getCurrentState() {
+        return FormState.ENTERING_EMAIL;
+    }
 }

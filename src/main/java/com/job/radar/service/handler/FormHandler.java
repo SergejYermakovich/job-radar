@@ -6,6 +6,7 @@ import com.job.radar.service.AskService;
 import com.job.radar.service.KeyboardService;
 import com.job.radar.service.ResumeService;
 import com.job.radar.service.StateMachineManager;
+import com.job.radar.service.processor.field.ResumeFieldProcessor;
 import com.job.radar.utils.ResumeFieldValidators;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.statemachine.StateMachine;
@@ -17,6 +18,7 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.Keyboard
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import static com.job.radar.utils.ButtonConsts.*;
 import static com.job.radar.utils.FieldNames.*;
@@ -27,11 +29,14 @@ import static com.job.radar.utils.FieldNames.*;
 public class FormHandler {
     private final StateMachineManager stateMachineManager;
     private final AskService askService;
+    private final Map<FormState, ResumeFieldProcessor> resumeFieldProcessorMap;
 
     public FormHandler(StateMachineManager stateMachineManager,
-                       AskService askService) {
+                       AskService askService, Map<FormState,
+                    ResumeFieldProcessor> resumeFieldProcessorMap) {
         this.stateMachineManager = stateMachineManager;
         this.askService = askService;
+        this.resumeFieldProcessorMap = resumeFieldProcessorMap;
     }
 
     public BotApiMethod<?> handleFormStep(Long chatId, String text) {
@@ -50,7 +55,7 @@ public class FormHandler {
             formMachine.sendEvent(FormEvent.PREVIOUS);
             return askPreviousQuestion(chatId);
         }
-        
+
         if (CANCEL.equals(text) || CMD_CANCEL.equals(text)) {
             formMachine.sendEvent(FormEvent.CANCEL);
             stateMachineManager.cleanupFormMachine(chatId);
@@ -61,18 +66,11 @@ public class FormHandler {
         }
 
         // Обработка по текущему состоянию
-        return switch (currentState) {
-            case ENTERING_FULL_NAME -> processFullName(chatId, text, formMachine);
-            case ENTERING_EMAIL -> processEmail(chatId, text, formMachine);
-            case ENTERING_PHONE -> processPhone(chatId, text, formMachine);
-            case ENTERING_AGE -> processAge(chatId, text, formMachine);
-            case ENTERING_CITY -> processCity(chatId, text, formMachine);
-
-            // ... обработка остальных полей
-
-            case CONFIRMING_FORM -> processConfirmation(chatId, text, formMachine);
-            default -> null;
-        };
+        ResumeFieldProcessor resumeFieldProcessor = resumeFieldProcessorMap.get(currentState);
+        if (resumeFieldProcessor == null) {
+            return null;
+        }
+        return resumeFieldProcessor.process(chatId, text, formMachine);
     }
 
     public BotApiMethod<?> askNextQuestion(Long chatId) {

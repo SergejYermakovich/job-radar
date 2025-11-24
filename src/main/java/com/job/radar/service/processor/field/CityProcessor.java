@@ -37,4 +37,9 @@ public class CityProcessor implements ResumeFieldProcessor {
                 .replyMarkup(keyboardService.createFormNavigationKeyboard())
                 .build();
     }
+
+    @Override
+    public FormState getCurrentState() {
+        return FormState.ENTERING_CITY;
+    }
 }
