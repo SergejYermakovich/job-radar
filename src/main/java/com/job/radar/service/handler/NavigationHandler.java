@@ -48,7 +48,7 @@ public class NavigationHandler {
         Long chatId = update.getMessage().getChatId();
         String text = update.getMessage().getText();
 
-        log.info("NavigationHandler text: {}, chat: {}", text, chatId);
+        log.info("NavigationHandler text update: {}, chat: {}", text, chatId);
 
         if (CMD_START.equals(text)) {
             stateMachineManager.cleanupUserSession(chatId);
@@ -106,37 +106,16 @@ public class NavigationHandler {
     }
 
     public BotApiMethod<?> handleResumeSection(Long chatId, String text) {
+        // Обработка кнопки "Назад"
+        if (BACK.equals(text)) {
+            return handleBackToMainMenu(chatId);
+        }
+        
         // Обработка кнопок в разделе резюме
         if (CREATE_RESUME.equals(text)) {
-            // Запускаем процесс создания резюме
-            StateMachine<ResumeState, ResumeEvent> resumeMachine = 
-                stateMachineManager.getResumeStateMachine(chatId);
-            resumeMachine.sendEvent(ResumeEvent.CREATE_RESUME);
-            
-            // Запускаем форму создания резюме
-            FormState formState = stateMachineManager.getCurrentFormState(chatId);
-            if (formState == null || formState == FormState.FORM_IDLE) {
-                StateMachine<FormState, FormEvent> formMachine = 
-                    stateMachineManager.getFormStateMachine(chatId);
-                formMachine.sendEvent(FormEvent.START_CREATION);
-                
-                // Запрашиваем первое поле формы
-                return SendMessage.builder()
-                    .chatId(chatId.toString())
-                    .text("👤 Введите ваше ФИО:")
-                    .replyMarkup(keyboardService.createFormNavigationKeyboard())
-                    .build();
-            }
+            return handleCreateResume(chatId);
         }
         
-        if (BACK.equals(text)) {
-            // Возвращаемся в главное меню
-            StateMachine<MenuState, MenuEvent> menuMachine = stateMachineManager.getMenuStateMachine(chatId);
-            menuMachine.sendEvent(MenuEvent.BACK);
-            return showMainMenu(chatId);
-        }
-        
-        // Если резюме существует и нажата кнопка "✏️ Редактировать"
         if (EDIT_RESUME.equals(text)) {
             // TODO: Реализовать редактирование резюме
             return showMainMenu(chatId);
@@ -145,13 +124,39 @@ public class NavigationHandler {
         // По умолчанию показываем раздел резюме
         return enterResumeSection(chatId);
     }
+    
+    private BotApiMethod<?> handleCreateResume(Long chatId) {
+        // Запускаем процесс создания резюме
+        StateMachine<ResumeState, ResumeEvent> resumeMachine = 
+            stateMachineManager.getResumeStateMachine(chatId);
+        resumeMachine.sendEvent(ResumeEvent.CREATE_RESUME);
+        
+        // Запускаем форму создания резюме
+        FormState formState = stateMachineManager.getCurrentFormState(chatId);
+        if (formState == null || formState == FormState.FORM_IDLE) {
+            StateMachine<FormState, FormEvent> formMachine = 
+                stateMachineManager.getFormStateMachine(chatId);
+            formMachine.sendEvent(FormEvent.START_CREATION);
+            
+            // Запрашиваем первое поле формы
+            return SendMessage.builder()
+                .chatId(chatId.toString())
+                .text("👤 Введите ваше ФИО:")
+                .replyMarkup(keyboardService.createFormNavigationKeyboard())
+                .build();
+        }
+        return enterResumeSection(chatId);
+    }
+    
+    private BotApiMethod<?> handleBackToMainMenu(Long chatId) {
+        StateMachine<MenuState, MenuEvent> menuMachine = stateMachineManager.getMenuStateMachine(chatId);
+        menuMachine.sendEvent(MenuEvent.BACK);
+        return showMainMenu(chatId);
+    }
 
     public BotApiMethod<?> handleVacanciesSection(Long chatId, String text) {
-        // Обработка кнопки "Назад" в разделе вакансий
         if (BACK.equals(text)) {
-            StateMachine<MenuState, MenuEvent> menuMachine = stateMachineManager.getMenuStateMachine(chatId);
-            menuMachine.sendEvent(MenuEvent.BACK);
-            return showMainMenu(chatId);
+            return handleBackToMainMenu(chatId);
         }
         
         // Обработка других кнопок в разделе вакансий
@@ -163,11 +168,8 @@ public class NavigationHandler {
 
 
     public BotApiMethod<?> handleSettingsSection(Long chatId, String text) {
-        // Обработка кнопки "Назад" в разделе настроек
         if (BACK.equals(text)) {
-            StateMachine<MenuState, MenuEvent> menuMachine = stateMachineManager.getMenuStateMachine(chatId);
-            menuMachine.sendEvent(MenuEvent.BACK);
-            return showMainMenu(chatId);
+            return handleBackToMainMenu(chatId);
         }
         
         // Обработка других кнопок в разделе настроек
@@ -177,19 +179,7 @@ public class NavigationHandler {
     }
 
     public BotApiMethod<?> showResumeCreationPrompt(Long chatId) {
-        ReplyKeyboardMarkup keyboard = new ReplyKeyboardMarkup();
-        keyboard.setResizeKeyboard(true);
-
-        List<KeyboardRow> rows = new ArrayList<>();
-        KeyboardRow row1 = new KeyboardRow();
-        row1.add(CREATE_RESUME);
-        rows.add(row1);
-
-        KeyboardRow row2 = new KeyboardRow();
-        row2.add(BACK);
-        rows.add(row2);
-
-        keyboard.setKeyboard(rows);
+        ReplyKeyboardMarkup keyboard = createSimpleKeyboard(CREATE_RESUME, BACK);
 
         return SendMessage.builder()
                 .chatId(chatId.toString())
@@ -199,8 +189,7 @@ public class NavigationHandler {
     }
 
     private BotApiMethod<?> showExistingResume(Long chatId, Resume resume) {
-        StringBuilder resumeText = new StringBuilder();
-        resumeText.append("📄 Ваше резюме:\n\n");
+        StringBuilder resumeText = new StringBuilder("📄 Ваше резюме:\n\n");
         
         if (resume.getFullName() != null) {
             resumeText.append("👤 ФИО: ").append(resume.getFullName()).append("\n");
@@ -218,19 +207,7 @@ public class NavigationHandler {
             resumeText.append("💼 Должность: ").append(resume.getPosition()).append("\n");
         }
 
-        ReplyKeyboardMarkup keyboard = new ReplyKeyboardMarkup();
-        keyboard.setResizeKeyboard(true);
-
-        List<KeyboardRow> rows = new ArrayList<>();
-        KeyboardRow row1 = new KeyboardRow();
-        row1.add(EDIT_RESUME);
-        rows.add(row1);
-
-        KeyboardRow row2 = new KeyboardRow();
-        row2.add(BACK);
-        rows.add(row2);
-
-        keyboard.setKeyboard(rows);
+        ReplyKeyboardMarkup keyboard = createSimpleKeyboard(EDIT_RESUME, BACK);
 
         return SendMessage.builder()
                 .chatId(chatId.toString())
@@ -238,32 +215,43 @@ public class NavigationHandler {
                 .replyMarkup(keyboard)
                 .build();
     }
+    
+    private ReplyKeyboardMarkup createSimpleKeyboard(String... buttons) {
+        ReplyKeyboardMarkup keyboard = new ReplyKeyboardMarkup();
+        keyboard.setResizeKeyboard(true);
+
+        List<KeyboardRow> rows = new ArrayList<>();
+        for (String button : buttons) {
+            KeyboardRow row = new KeyboardRow();
+            row.add(button);
+            rows.add(row);
+        }
+
+        keyboard.setKeyboard(rows);
+        return keyboard;
+    }
 
     private BotApiMethod<?> enterResumeSection(Long chatId) {
         // Получаем или создаем Resume State Machine
         stateMachineManager.getResumeStateMachine(chatId);
 
         Optional<Resume> resume = resumeService.findByChatId(chatId);
-
-        if (resume.isPresent()) {
-            return showExistingResume(chatId, resume.get());
-        } else {
-            return showResumeCreationPrompt(chatId);
-        }
+        return resume.isPresent() 
+                ? showExistingResume(chatId, resume.get())
+                : showResumeCreationPrompt(chatId);
     }
 
     private BotApiMethod<?> showMainMenu(Long chatId) {
-        // Убеждаемся, что мы в главном меню
         StateMachine<MenuState, MenuEvent> menuMachine = stateMachineManager.getMenuStateMachine(chatId);
+        // Сбрасываем состояние, если не в главном меню
         if (menuMachine.getState().getId() != MenuState.MAIN_MENU) {
-            // Сбрасываем состояние
             stateMachineManager.cleanupUserSession(chatId);
         }
-        ReplyKeyboardMarkup keyboard = keyboardService.createMainMenuKeyboard();
+        
         return SendMessage.builder()
                 .chatId(chatId.toString())
                 .text("Главное меню:")
-                .replyMarkup(keyboard)
+                .replyMarkup(keyboardService.createMainMenuKeyboard())
                 .build();
     }
 }

@@ -32,8 +32,9 @@ public class FormHandler {
     private final Map<FormState, ResumeFieldProcessor> resumeFieldProcessorMap;
 
     public FormHandler(StateMachineManager stateMachineManager,
-                       AskService askService, Map<FormState,
-                    ResumeFieldProcessor> resumeFieldProcessorMap) {
+                       AskService askService,
+                       Map<FormState, ResumeFieldProcessor> resumeFieldProcessorMap
+    ) {
         this.stateMachineManager = stateMachineManager;
         this.askService = askService;
         this.resumeFieldProcessorMap = resumeFieldProcessorMap;
