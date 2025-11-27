@@ -10,6 +10,7 @@ import com.job.radar.model.enums.statemachine.state.ResumeState;
 import com.job.radar.service.KeyboardService;
 import com.job.radar.service.ResumeService;
 import com.job.radar.service.StateMachineManager;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.statemachine.StateMachine;
 import org.springframework.stereotype.Service;
@@ -25,21 +26,13 @@ import java.util.Optional;
 
 import static com.job.radar.utils.ButtonConsts.*;
 
-@SuppressWarnings("deprecation")
+@RequiredArgsConstructor
 @Slf4j
 @Service
 public class NavigationHandler {
     private final StateMachineManager stateMachineManager;
     private final ResumeService resumeService;
     private final KeyboardService keyboardService;
-
-    public NavigationHandler(StateMachineManager stateMachineManager,
-                             ResumeService resumeService,
-                             KeyboardService keyboardService) {
-        this.stateMachineManager = stateMachineManager;
-        this.resumeService = resumeService;
-        this.keyboardService = keyboardService;
-    }
 
     public BotApiMethod<?> handleUpdate(Update update) {
         if (!update.hasMessage() || !update.getMessage().hasText()) {
