@@ -34,6 +34,7 @@ public class ButtonConsts {
     
     // Команды
     public static final String CMD_START = "/start";
+    public static final String CMD_TEST = "/test";
     public static final String CMD_CANCEL = "/cancel";
     public static final String CMD_SKIP = "/skip";
     public static final String CMD_BACK = "/back";

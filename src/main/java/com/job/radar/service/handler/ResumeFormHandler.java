@@ -4,6 +4,7 @@ import com.job.radar.model.enums.statemachine.event.ResumeEvent;
 import com.job.radar.model.enums.statemachine.state.ResumeState;
 import com.job.radar.service.ResumeService;
 import com.job.radar.service.StateMachineManager;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.statemachine.StateMachine;
 import org.springframework.stereotype.Service;
@@ -14,18 +15,13 @@ import static com.job.radar.utils.ButtonConsts.*;
 import static com.job.radar.utils.FieldNames.EMAIL;
 import static com.job.radar.utils.FieldNames.FULL_NAME;
 
+@RequiredArgsConstructor
 @Slf4j
 @SuppressWarnings("deprecation")
 @Service
 public class ResumeFormHandler {
     private final StateMachineManager stateMachineManager;
     private final ResumeService resumeService;
-
-    public ResumeFormHandler(StateMachineManager stateMachineManager,
-                             ResumeService resumeService) {
-        this.stateMachineManager = stateMachineManager;
-        this.resumeService = resumeService;
-    }
 
     public BotApiMethod<?> processResumeStep(Long chatId, String text) {
         StateMachine<ResumeState, ResumeEvent> resumeMachine = stateMachineManager.getResumeStateMachine(chatId);

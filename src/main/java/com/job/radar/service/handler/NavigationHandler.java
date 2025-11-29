@@ -7,6 +7,7 @@ import com.job.radar.model.enums.statemachine.event.ResumeEvent;
 import com.job.radar.model.enums.statemachine.state.FormState;
 import com.job.radar.model.enums.statemachine.state.MenuState;
 import com.job.radar.model.enums.statemachine.state.ResumeState;
+import com.job.radar.service.HeadHunterHttpService;
 import com.job.radar.service.KeyboardService;
 import com.job.radar.service.ResumeService;
 import com.job.radar.service.StateMachineManager;
@@ -20,6 +21,7 @@ import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -33,6 +35,7 @@ public class NavigationHandler {
     private final StateMachineManager stateMachineManager;
     private final ResumeService resumeService;
     private final KeyboardService keyboardService;
+    private final HeadHunterHttpService headHunterHttpService;
 
     public BotApiMethod<?> handleUpdate(Update update) {
         if (!update.hasMessage() || !update.getMessage().hasText()) {
@@ -51,6 +54,10 @@ public class NavigationHandler {
         if (CMD_CANCEL.equals(text)) {
             stateMachineManager.cleanupResumeMachine(chatId);
             return showMainMenu(chatId);
+        }
+
+        if (CMD_TEST.equals(text)) {
+            return showTest(chatId);
         }
 
         return handleNavigation(chatId, text);
@@ -244,6 +251,20 @@ public class NavigationHandler {
         return SendMessage.builder()
                 .chatId(chatId.toString())
                 .text("Главное меню:")
+                .replyMarkup(keyboardService.createMainMenuKeyboard())
+                .build();
+    }
+
+    private BotApiMethod<?> showTest(Long chatId) {
+        String response = null;
+        try {
+            response = headHunterHttpService.searchVacancies("java");
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        return SendMessage.builder()
+                .chatId(chatId.toString())
+                .text(response)
                 .replyMarkup(keyboardService.createMainMenuKeyboard())
                 .build();
     }
