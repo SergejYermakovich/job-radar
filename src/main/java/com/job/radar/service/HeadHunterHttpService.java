@@ -2,6 +2,7 @@ package com.job.radar.service;
 
 import com.google.gson.Gson;
 import com.job.radar.model.integration.VacancyResponse;
+import com.job.radar.utils.HeadHunterApiConsts;
 import lombok.RequiredArgsConstructor;
 import okhttp3.HttpUrl;
 import okhttp3.OkHttpClient;
@@ -18,7 +19,8 @@ public class HeadHunterHttpService {
     private final Gson gson;
 
     public VacancyResponse searchVacancies(String technology) throws IOException {
-        HttpUrl url = HttpUrl.parse("https://api.hh.ru/vacancies").newBuilder()
+        HttpUrl url = HttpUrl.parse(HeadHunterApiConsts.BASE_URL + HeadHunterApiConsts.VACANCIES)
+                .newBuilder()
                 .addQueryParameter("text", technology)
                 .addQueryParameter("per_page", "20")
                 .build();
