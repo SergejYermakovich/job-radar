@@ -1,6 +1,7 @@
 package com.job.radar.service;
 
 import com.google.gson.Gson;
+import com.job.radar.model.integration.VacancyResponse;
 import lombok.RequiredArgsConstructor;
 import okhttp3.HttpUrl;
 import okhttp3.OkHttpClient;
@@ -16,7 +17,7 @@ public class HeadHunterHttpService {
     private final OkHttpClient httpClient;
     private final Gson gson;
 
-    public String searchVacancies(String technology) throws IOException {
+    public VacancyResponse searchVacancies(String technology) throws IOException {
         HttpUrl url = HttpUrl.parse("https://api.hh.ru/vacancies").newBuilder()
                 .addQueryParameter("text", technology)
                 .addQueryParameter("per_page", "20")
@@ -25,7 +26,7 @@ public class HeadHunterHttpService {
         Request request = new Request.Builder().url(url).build();
 
         try (Response response = httpClient.newCall(request).execute()) {
-            return gson.fromJson(response.body().string(), String.class);
+            return gson.fromJson(response.body().string(), VacancyResponse.class);
         }
     }
 }

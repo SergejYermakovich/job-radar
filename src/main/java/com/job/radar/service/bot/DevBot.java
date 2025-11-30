@@ -35,7 +35,7 @@ public class DevBot extends TelegramLongPollingBot {
             try {
                 execute(response);
             } catch (TelegramApiException e) {
-                log.error("onUpdateReceived error.");
+                log.error("onUpdateReceived error.", e);
             }
         });
     }

@@ -7,6 +7,8 @@ import com.job.radar.model.enums.statemachine.event.ResumeEvent;
 import com.job.radar.model.enums.statemachine.state.FormState;
 import com.job.radar.model.enums.statemachine.state.MenuState;
 import com.job.radar.model.enums.statemachine.state.ResumeState;
+import com.job.radar.model.integration.Vacancy;
+import com.job.radar.model.integration.VacancyResponse;
 import com.job.radar.service.HeadHunterHttpService;
 import com.job.radar.service.KeyboardService;
 import com.job.radar.service.ResumeService;
@@ -256,15 +258,19 @@ public class NavigationHandler {
     }
 
     private BotApiMethod<?> showTest(Long chatId) {
-        String response = null;
+        VacancyResponse response = null;
         try {
             response = headHunterHttpService.searchVacancies("java");
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+
+        for (Vacancy vacancy: response.getVacancies()) {
+            log.info(vacancy.toString());
+        }
         return SendMessage.builder()
                 .chatId(chatId.toString())
-                .text(response)
+                .text("vacancies: " + response.getFound())
                 .replyMarkup(keyboardService.createMainMenuKeyboard())
                 .build();
     }
