@@ -25,7 +25,9 @@ public class HeadHunterHttpService {
                 .addQueryParameter("per_page", "20")
                 .build();
 
-        Request request = new Request.Builder().url(url).build();
+        Request request = new Request.Builder()
+                .url(url)
+                .build();
 
         try (Response response = httpClient.newCall(request).execute()) {
             return gson.fromJson(response.body().string(), VacancyResponse.class);
