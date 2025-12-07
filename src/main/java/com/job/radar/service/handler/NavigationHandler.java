@@ -14,13 +14,17 @@ import com.job.radar.service.HeadHunterHttpService;
 import com.job.radar.service.KeyboardService;
 import com.job.radar.service.ResumeService;
 import com.job.radar.service.StateMachineManager;
+import com.job.radar.service.VacancySearchService;
 import com.job.radar.utils.LoggerUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.statemachine.StateMachine;
 import org.springframework.stereotype.Service;
 import org.telegram.telegrambots.meta.api.methods.BotApiMethod;
+import org.telegram.telegrambots.meta.api.methods.AnswerCallbackQuery;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
+import org.telegram.telegrambots.meta.api.methods.updatingmessages.DeleteMessage;
+import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
@@ -32,6 +36,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import static com.job.radar.utils.ButtonConsts.*;
 
@@ -44,6 +49,7 @@ public class NavigationHandler {
     private final KeyboardService keyboardService;
     private final HeadHunterHttpService headHunterHttpService;
     private final MessageSender messageSender;
+    private final VacancySearchService vacancySearchService;
 
     public BotApiMethod<?> handleUpdate(Update update) {
         if (!update.hasMessage() || !update.getMessage().hasText()) {
@@ -284,9 +290,15 @@ public class NavigationHandler {
     }
 
     private BotApiMethod<?> searchVacancies(Long chatId) {
+        return searchVacancies(chatId, 0);
+    }
+
+    private BotApiMethod<?> searchVacancies(Long chatId, int page) {
+        String searchQuery = "java"; // TODO: получать из профиля пользователя
+        
         VacancyResponse response = null;
         try {
-            response = headHunterHttpService.searchVacancies("java");
+            response = headHunterHttpService.searchVacancies(searchQuery, page);
         } catch (IOException e) {
             log.error("Error searching vacancies", e);
             return SendMessage.builder()
@@ -297,6 +309,7 @@ public class NavigationHandler {
         }
 
         if (response.getVacancies() == null || response.getVacancies().isEmpty()) {
+            vacancySearchService.clearSearchSession(chatId);
             return SendMessage.builder()
                     .chatId(chatId.toString())
                     .text("🔍 Вакансии не найдены.")
@@ -304,8 +317,36 @@ public class NavigationHandler {
                     .build();
         }
 
-        // Send individual messages for each vacancy
-        for (Vacancy vacancy : response.getVacancies()) {
+        // Фильтруем только новые вакансии (не просмотренные ранее)
+        List<Vacancy> newVacancies = filterNewVacancies(chatId, response.getVacancies());
+        
+        if (newVacancies.isEmpty() && page == 0) {
+            // Если на первой странице все вакансии уже просмотрены, показываем их все равно
+            newVacancies = response.getVacancies();
+        } else if (newVacancies.isEmpty()) {
+            // Если на других страницах все просмотрены, переходим на следующую
+            return showVacanciesPage(chatId, searchQuery, page + 1, response.getPages(), response.getFound());
+        }
+
+        // Сохраняем сессию поиска
+        VacancySearchService.SearchSession session = new VacancySearchService.SearchSession(
+                searchQuery, 
+                page, 
+                response.getPages(), 
+                response.getFound(), 
+                response.getPerPage()
+        );
+        session.getAllVacancyIds().addAll(
+                newVacancies.stream().map(Vacancy::getId).toList()
+        );
+        vacancySearchService.saveSearchSession(chatId, session);
+
+        // Отмечаем вакансии как просмотренные
+        List<String> vacancyIds = newVacancies.stream().map(Vacancy::getId).toList();
+        vacancySearchService.markVacanciesAsViewed(chatId, vacancyIds);
+
+        // Отправляем вакансии
+        for (Vacancy vacancy : newVacancies) {
             try {
                 sendVacancyMessage(chatId, vacancy);
             } catch (TelegramApiException e) {
@@ -313,18 +354,211 @@ public class NavigationHandler {
             }
         }
 
+        // Отправляем сообщение с пагинацией в конце (после всех вакансий)
+        try {
+            SendMessage paginationMessage = (SendMessage) showVacanciesPage(chatId, searchQuery, page, response.getPages(), response.getFound());
+            messageSender.execute(paginationMessage);
+        } catch (TelegramApiException e) {
+            log.error("Error sending pagination message", e);
+        }
+
+        // Возвращаем null, так как сообщения уже отправлены
+        return null;
+    }
+
+    private List<Vacancy> filterNewVacancies(Long chatId, List<Vacancy> vacancies) {
+        Set<String> viewedIds = vacancySearchService.getViewedVacancyIds(chatId);
+        return vacancies.stream()
+                .filter(v -> !viewedIds.contains(v.getId()))
+                .toList();
+    }
+
+    private BotApiMethod<?> showVacanciesPage(Long chatId,
+                                              String searchQuery,
+                                              int currentPage,
+                                              int totalPages,
+                                              int totalFound
+    ) {
         String messageText = String.format(
-                "🔍 Найдено вакансий: %d\n\n" +
-                "Показано первых %d результатов.",
-                response.getFound(),
-                response.getVacancies().size()
+                "🔍 Найдено вакансий: %d\n" +
+                "📄 Страница %d из %d",
+                totalFound,
+                currentPage + 1,
+                totalPages
         );
+
+        InlineKeyboardMarkup keyboard = createPaginationKeyboard(chatId, currentPage, totalPages);
 
         return SendMessage.builder()
                 .chatId(chatId.toString())
                 .text(messageText)
-                .replyMarkup(keyboardService.createVacanciesMenuKeyboard())
+                .replyMarkup(keyboard)
                 .build();
+    }
+
+    private InlineKeyboardMarkup createPaginationKeyboard(Long chatId, int currentPage, int totalPages) {
+        InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        List<InlineKeyboardButton> row = new ArrayList<>();
+
+        // Кнопка "Назад"
+        if (currentPage > 0) {
+            InlineKeyboardButton prevButton = new InlineKeyboardButton();
+            prevButton.setText("◀️ Назад");
+            prevButton.setCallbackData("vacancy_page_" + (currentPage - 1));
+            row.add(prevButton);
+        }
+
+        // Кнопка "Вперед"
+        if (currentPage < totalPages - 1) {
+            InlineKeyboardButton nextButton = new InlineKeyboardButton();
+            nextButton.setText("Вперед ▶️");
+            nextButton.setCallbackData("vacancy_page_" + (currentPage + 1));
+            row.add(nextButton);
+        }
+
+        if (!row.isEmpty()) {
+            rows.add(row);
+        }
+
+        // Кнопка "Новый поиск" (очищает просмотренные)
+        List<InlineKeyboardButton> newSearchRow = new ArrayList<>();
+        InlineKeyboardButton newSearchButton = new InlineKeyboardButton();
+        newSearchButton.setText("🔄 Новый поиск");
+        newSearchButton.setCallbackData("vacancy_new_search");
+        newSearchRow.add(newSearchButton);
+        rows.add(newSearchRow);
+
+        keyboard.setKeyboard(rows);
+        return keyboard;
+    }
+
+    /**
+     * Обработка callback query для пагинации
+     */
+    public BotApiMethod<?> handleCallbackQuery(CallbackQuery callbackQuery) {
+        Long chatId = callbackQuery.getMessage().getChatId();
+        String data = callbackQuery.getData();
+        Integer messageId = callbackQuery.getMessage().getMessageId();
+
+        // Отвечаем на callback query сразу
+        try {
+            messageSender.execute(AnswerCallbackQuery.builder()
+                    .callbackQueryId(callbackQuery.getId())
+                    .build());
+        } catch (TelegramApiException e) {
+            log.error("Error answering callback query", e);
+        }
+
+        if (data.startsWith("vacancy_page_")) {
+            int page = Integer.parseInt(data.replace("vacancy_page_", ""));
+            VacancySearchService.SearchSession session = vacancySearchService.getSearchSession(chatId);
+            
+            // Получаем новые вакансии для страницы
+            String searchQuery = session != null ? session.getSearchQuery() : "java";
+            VacancyResponse response;
+            try {
+                response = headHunterHttpService.searchVacancies(searchQuery, page);
+            } catch (IOException e) {
+                log.error("Error searching vacancies in callback", e);
+                return null;
+            }
+
+            if (response.getVacancies() == null || response.getVacancies().isEmpty()) {
+                return null;
+            }
+
+            // Определяем направление навигации
+            VacancySearchService.SearchSession currentSession = vacancySearchService.getSearchSession(chatId);
+            boolean goingForward = true;
+            if (currentSession != null) {
+                goingForward = page > currentSession.getCurrentPage();
+            }
+            
+            // Фильтруем только новые вакансии
+            List<Vacancy> newVacancies = filterNewVacancies(chatId, response.getVacancies());
+            
+            // Если идем назад, показываем все вакансии страницы (даже если просмотрены)
+            // Если идем вперед и все просмотрены, ищем новые на следующих страницах
+            if (newVacancies.isEmpty() && goingForward) {
+                // Ищем новые вакансии на следующих страницах
+                int currentPage = page;
+                while (newVacancies.isEmpty() && currentPage < response.getPages() - 1) {
+                    currentPage++;
+                    try {
+                        VacancyResponse nextResponse = headHunterHttpService.searchVacancies(searchQuery, currentPage);
+                        if (nextResponse.getVacancies() != null && !nextResponse.getVacancies().isEmpty()) {
+                            newVacancies = filterNewVacancies(chatId, nextResponse.getVacancies());
+                            if (!newVacancies.isEmpty()) {
+                                response = nextResponse;
+                                page = currentPage;
+                                break;
+                            }
+                        }
+                    } catch (IOException e) {
+                        log.error("Error searching next page", e);
+                        break;
+                    }
+                }
+            }
+            
+            // Если все равно пусто, показываем все вакансии текущей страницы
+            if (newVacancies.isEmpty()) {
+                newVacancies = response.getVacancies();
+            }
+
+            // Обновляем сессию
+            VacancySearchService.SearchSession newSession = new VacancySearchService.SearchSession(
+                    searchQuery, 
+                    page, 
+                    response.getPages(), 
+                    response.getFound(), 
+                    response.getPerPage()
+            );
+            newSession.getAllVacancyIds().addAll(
+                    newVacancies.stream().map(Vacancy::getId).toList()
+            );
+            vacancySearchService.saveSearchSession(chatId, newSession);
+
+            // Отмечаем как просмотренные
+            List<String> vacancyIds = newVacancies.stream().map(Vacancy::getId).toList();
+            vacancySearchService.markVacanciesAsViewed(chatId, vacancyIds);
+
+            // Удаляем старое сообщение с пагинацией
+            try {
+                messageSender.execute(DeleteMessage.builder()
+                        .chatId(chatId.toString())
+                        .messageId(messageId)
+                        .build());
+            } catch (TelegramApiException e) {
+                log.error("Error deleting old pagination message", e);
+            }
+
+            // Отправляем вакансии
+            for (Vacancy vacancy : newVacancies) {
+                try {
+                    sendVacancyMessage(chatId, vacancy);
+                } catch (TelegramApiException e) {
+                    log.error("Error sending vacancy message", e);
+                }
+            }
+
+            // Отправляем новое сообщение с пагинацией в конце (после всех вакансий)
+            try {
+                SendMessage paginationMessage = (SendMessage) showVacanciesPage(chatId, searchQuery, page, response.getPages(), response.getFound());
+                messageSender.execute(paginationMessage);
+            } catch (TelegramApiException e) {
+                log.error("Error sending pagination message", e);
+            }
+
+            return null;
+        } else if (data.equals("vacancy_new_search")) {
+            // Очищаем просмотренные вакансии для нового поиска
+            vacancySearchService.clearSearchSession(chatId);
+            return searchVacancies(chatId, 0);
+        }
+
+        return null;
     }
 
     private void sendVacancyMessage(Long chatId, Vacancy vacancy) throws TelegramApiException {

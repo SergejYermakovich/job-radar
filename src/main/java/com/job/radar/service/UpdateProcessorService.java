@@ -40,6 +40,11 @@ public class UpdateProcessorService {
     }
 
     private BotApiMethod<?> process(Update update) {
+        // Обработка callback query
+        if (update.hasCallbackQuery()) {
+            return navigationHandler.handleCallbackQuery(update.getCallbackQuery());
+        }
+
         if (!update.hasMessage() || !update.getMessage().hasText()) {
             return null;
         }
