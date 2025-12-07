@@ -57,7 +57,9 @@ public class ResumeService {
     }
 
     @Transactional
-    public Resume createOrUpdate(Long chatId, String field, Integer value) {
+    public Resume createOrUpdate(Long chatId,
+                                 String field,
+                                 Integer value) {
         Optional<Resume> existingResume = findByChatId(chatId);
         Resume resume = existingResume.orElse(Resume.builder().chatId(chatId).build());
 

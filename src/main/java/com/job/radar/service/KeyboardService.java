@@ -55,7 +55,7 @@ public class KeyboardService {
         return keyboard;
     }
 
-    public BotApiMethod<?> showVacanciesMenu(Long chatId) {
+    public ReplyKeyboardMarkup createVacanciesMenuKeyboard() {
         ReplyKeyboardMarkup keyboard = new ReplyKeyboardMarkup();
         keyboard.setResizeKeyboard(true);
 
@@ -73,11 +73,14 @@ public class KeyboardService {
         rows.add(row3);
 
         keyboard.setKeyboard(rows);
+        return keyboard;
+    }
 
+    public BotApiMethod<?> showVacanciesMenu(Long chatId) {
         return SendMessage.builder()
                 .chatId(chatId.toString())
                 .text("💼 Раздел вакансий:")
-                .replyMarkup(keyboard)
+                .replyMarkup(createVacanciesMenuKeyboard())
                 .build();
     }
 

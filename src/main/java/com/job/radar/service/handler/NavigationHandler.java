@@ -7,6 +7,7 @@ import com.job.radar.model.enums.statemachine.event.ResumeEvent;
 import com.job.radar.model.enums.statemachine.state.FormState;
 import com.job.radar.model.enums.statemachine.state.MenuState;
 import com.job.radar.model.enums.statemachine.state.ResumeState;
+import com.job.radar.model.integration.Salary;
 import com.job.radar.model.integration.Vacancy;
 import com.job.radar.model.integration.VacancyResponse;
 import com.job.radar.service.HeadHunterHttpService;
@@ -21,8 +22,11 @@ import org.springframework.stereotype.Service;
 import org.telegram.telegrambots.meta.api.methods.BotApiMethod;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.Update;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
+import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -39,6 +43,7 @@ public class NavigationHandler {
     private final ResumeService resumeService;
     private final KeyboardService keyboardService;
     private final HeadHunterHttpService headHunterHttpService;
+    private final MessageSender messageSender;
 
     public BotApiMethod<?> handleUpdate(Update update) {
         if (!update.hasMessage() || !update.getMessage().hasText()) {
@@ -162,8 +167,11 @@ public class NavigationHandler {
             return handleBackToMainMenu(chatId);
         }
 
-        // Обработка других кнопок в разделе вакансий
-        // TODO: Добавить обработку "🔍 Поиск вакансий" и "📋 Мои отклики"
+        if (SEARCH_VACANCIES.equals(text)) {
+            return searchVacancies(chatId);
+        }
+
+        // TODO: Добавить обработку "📋 Мои отклики"
 
         return keyboardService.showVacanciesMenu(chatId);
     }
@@ -260,7 +268,7 @@ public class NavigationHandler {
     private BotApiMethod<?> showTest(Long chatId) {
         VacancyResponse response = null;
         try {
-            response = headHunterHttpService.searchVacancies("sex");
+            response = headHunterHttpService.searchVacancies("java");
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -273,5 +281,119 @@ public class NavigationHandler {
                 .text("vacancies: " + response.getFound())
                 .replyMarkup(keyboardService.createMainMenuKeyboard())
                 .build();
+    }
+
+    private BotApiMethod<?> searchVacancies(Long chatId) {
+        VacancyResponse response = null;
+        try {
+            response = headHunterHttpService.searchVacancies("java");
+        } catch (IOException e) {
+            log.error("Error searching vacancies", e);
+            return SendMessage.builder()
+                    .chatId(chatId.toString())
+                    .text("❌ Произошла ошибка при поиске вакансий. Попробуйте позже.")
+                    .replyMarkup(keyboardService.createVacanciesMenuKeyboard())
+                    .build();
+        }
+
+        if (response.getVacancies() == null || response.getVacancies().isEmpty()) {
+            return SendMessage.builder()
+                    .chatId(chatId.toString())
+                    .text("🔍 Вакансии не найдены.")
+                    .replyMarkup(keyboardService.createVacanciesMenuKeyboard())
+                    .build();
+        }
+
+        // Send individual messages for each vacancy
+        for (Vacancy vacancy : response.getVacancies()) {
+            try {
+                sendVacancyMessage(chatId, vacancy);
+            } catch (TelegramApiException e) {
+                log.error("Error sending vacancy message", e);
+            }
+        }
+
+        String messageText = String.format(
+                "🔍 Найдено вакансий: %d\n\n" +
+                "Показано первых %d результатов.",
+                response.getFound(),
+                response.getVacancies().size()
+        );
+
+        return SendMessage.builder()
+                .chatId(chatId.toString())
+                .text(messageText)
+                .replyMarkup(keyboardService.createVacanciesMenuKeyboard())
+                .build();
+    }
+
+    private void sendVacancyMessage(Long chatId, Vacancy vacancy) throws TelegramApiException {
+        StringBuilder messageText = new StringBuilder();
+        
+        // Vacancy name
+        if (vacancy.getName() != null) {
+            messageText.append("💼 ").append(vacancy.getName()).append("\n\n");
+        }
+        
+        // Salary
+        if (vacancy.getSalary() != null) {
+            Salary salary = vacancy.getSalary();
+            messageText.append("💰 Зарплата: ");
+            if (salary.getFrom() != null && salary.getTo() != null) {
+                messageText.append(salary.getFrom()).append(" - ").append(salary.getTo());
+            } else if (salary.getFrom() != null) {
+                messageText.append("от ").append(salary.getFrom());
+            } else if (salary.getTo() != null) {
+                messageText.append("до ").append(salary.getTo());
+            }
+            if (salary.getCurrency() != null) {
+                messageText.append(" ").append(salary.getCurrency());
+            }
+            if (salary.getIsGross() != null && salary.getIsGross()) {
+                messageText.append(" (до вычета НДФЛ)");
+            }
+            messageText.append("\n");
+        }
+        
+        // Area (location)
+        if (vacancy.getArea() != null && vacancy.getArea().getName() != null) {
+            messageText.append("📍 ").append(vacancy.getArea().getName()).append("\n");
+        }
+        
+        // Employer
+        if (vacancy.getEmployer() != null && vacancy.getEmployer().getName() != null) {
+            messageText.append("🏢 ").append(vacancy.getEmployer().getName()).append("\n");
+        }
+        
+        // Experience
+        if (vacancy.getExperience() != null && vacancy.getExperience().getName() != null) {
+            messageText.append("📊 Опыт: ").append(vacancy.getExperience().getName()).append("\n");
+        }
+        
+        // Employment type
+        if (vacancy.getEmployment() != null && vacancy.getEmployment().getName() != null) {
+            messageText.append("⏰ ").append(vacancy.getEmployment().getName()).append("\n");
+        }
+
+        // Create inline keyboard with link button
+        InlineKeyboardMarkup inlineKeyboard = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> keyboard = new ArrayList<>();
+        List<InlineKeyboardButton> row = new ArrayList<>();
+        
+        InlineKeyboardButton linkButton = new InlineKeyboardButton();
+        linkButton.setText("🔗 Открыть вакансию");
+        linkButton.setUrl(vacancy.getAlternateUrl());
+        row.add(linkButton);
+        
+        keyboard.add(row);
+        inlineKeyboard.setKeyboard(keyboard);
+
+        SendMessage message = SendMessage.builder()
+                .chatId(chatId.toString())
+                .text(messageText.toString())
+                .replyMarkup(inlineKeyboard)
+                .build();
+
+        messageSender.execute(message);
     }
 }
