@@ -7,7 +7,6 @@ import com.job.radar.model.enums.statemachine.event.ResumeEvent;
 import com.job.radar.model.enums.statemachine.state.FormState;
 import com.job.radar.model.enums.statemachine.state.MenuState;
 import com.job.radar.model.enums.statemachine.state.ResumeState;
-import com.job.radar.model.integration.Salary;
 import com.job.radar.model.integration.Vacancy;
 import com.job.radar.model.integration.VacancyResponse;
 import com.job.radar.service.HeadHunterHttpService;
@@ -15,7 +14,7 @@ import com.job.radar.service.KeyboardService;
 import com.job.radar.service.ResumeService;
 import com.job.radar.service.StateMachineManager;
 import com.job.radar.service.VacancySearchService;
-import com.job.radar.utils.LoggerUtil;
+import com.job.radar.utils.MessageGenerator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.statemachine.StateMachine;
@@ -364,7 +363,7 @@ public class NavigationHandler {
                 totalPages
         );
 
-        InlineKeyboardMarkup keyboard = createPaginationKeyboard(chatId, currentPage, totalPages);
+        InlineKeyboardMarkup keyboard = keyboardService.createVacancyPaginationKeyboard(currentPage, totalPages);
 
         return SendMessage.builder()
                 .chatId(chatId.toString())
@@ -373,42 +372,6 @@ public class NavigationHandler {
                 .build();
     }
 
-    private InlineKeyboardMarkup createPaginationKeyboard(Long chatId, int currentPage, int totalPages) {
-        InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
-        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
-        List<InlineKeyboardButton> row = new ArrayList<>();
-
-        // Кнопка "Назад"
-        if (currentPage > 0) {
-            InlineKeyboardButton prevButton = new InlineKeyboardButton();
-            prevButton.setText("◀️ Назад");
-            prevButton.setCallbackData("vacancy_page_" + (currentPage - 1));
-            row.add(prevButton);
-        }
-
-        // Кнопка "Вперед"
-        if (currentPage < totalPages - 1) {
-            InlineKeyboardButton nextButton = new InlineKeyboardButton();
-            nextButton.setText("Вперед ▶️");
-            nextButton.setCallbackData("vacancy_page_" + (currentPage + 1));
-            row.add(nextButton);
-        }
-
-        if (!row.isEmpty()) {
-            rows.add(row);
-        }
-
-        // Кнопка "Новый поиск" (очищает просмотренные)
-        List<InlineKeyboardButton> newSearchRow = new ArrayList<>();
-        InlineKeyboardButton newSearchButton = new InlineKeyboardButton();
-        newSearchButton.setText("🔄 Новый поиск");
-        newSearchButton.setCallbackData("vacancy_new_search");
-        newSearchRow.add(newSearchButton);
-        rows.add(newSearchRow);
-
-        keyboard.setKeyboard(rows);
-        return keyboard;
-    }
 
     /**
      * Обработка callback query для пагинации
@@ -539,52 +502,7 @@ public class NavigationHandler {
     }
 
     private void sendVacancyMessage(Long chatId, Vacancy vacancy) throws TelegramApiException {
-        StringBuilder messageText = new StringBuilder();
-        
-        // Vacancy name
-        if (vacancy.getName() != null) {
-            messageText.append("💼 ").append(vacancy.getName()).append("\n\n");
-        }
-        
-        // Salary
-        if (vacancy.getSalary() != null) {
-            Salary salary = vacancy.getSalary();
-            messageText.append("💰 Зарплата: ");
-            if (salary.getFrom() != null && salary.getTo() != null) {
-                messageText.append(salary.getFrom()).append(" - ").append(salary.getTo());
-            } else if (salary.getFrom() != null) {
-                messageText.append("от ").append(salary.getFrom());
-            } else if (salary.getTo() != null) {
-                messageText.append("до ").append(salary.getTo());
-            }
-            if (salary.getCurrency() != null) {
-                messageText.append(" ").append(salary.getCurrency());
-            }
-            if (salary.getIsGross() != null && salary.getIsGross()) {
-                messageText.append(" (до вычета НДФЛ)");
-            }
-            messageText.append("\n");
-        }
-        
-        // Area (location)
-        if (vacancy.getArea() != null && vacancy.getArea().getName() != null) {
-            messageText.append("📍 ").append(vacancy.getArea().getName()).append("\n");
-        }
-        
-        // Employer
-        if (vacancy.getEmployer() != null && vacancy.getEmployer().getName() != null) {
-            messageText.append("🏢 ").append(vacancy.getEmployer().getName()).append("\n");
-        }
-        
-        // Experience
-        if (vacancy.getExperience() != null && vacancy.getExperience().getName() != null) {
-            messageText.append("📊 Опыт: ").append(vacancy.getExperience().getName()).append("\n");
-        }
-        
-        // Employment type
-        if (vacancy.getEmployment() != null && vacancy.getEmployment().getName() != null) {
-            messageText.append("⏰ ").append(vacancy.getEmployment().getName()).append("\n");
-        }
+        String vacancyMessage = MessageGenerator.generateMessage(vacancy);
 
         // Create inline keyboard with link button
         InlineKeyboardMarkup inlineKeyboard = new InlineKeyboardMarkup();
@@ -601,7 +519,7 @@ public class NavigationHandler {
 
         SendMessage message = SendMessage.builder()
                 .chatId(chatId.toString())
-                .text(messageText.toString())
+                .text(vacancyMessage)
                 .replyMarkup(inlineKeyboard)
                 .build();
 
