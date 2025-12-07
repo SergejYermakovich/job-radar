@@ -125,6 +125,7 @@ public class NavigationHandler {
             return handleCreateResume(chatId);
         }
 
+
         if (EDIT_RESUME.equals(text)) {
             // TODO: Реализовать редактирование резюме
             return showMainMenu(chatId);
@@ -169,7 +170,7 @@ public class NavigationHandler {
         }
 
         if (SEARCH_VACANCIES.equals(text)) {
-            return searchVacancies(chatId);
+            return handleSearchVacancies(chatId);
         }
 
         // TODO: Добавить обработку "📋 Мои отклики"
@@ -199,29 +200,11 @@ public class NavigationHandler {
     }
 
     private BotApiMethod<?> showExistingResume(Long chatId, Resume resume) {
-        StringBuilder resumeText = new StringBuilder("📄 Ваше резюме:\n\n");
-
-        if (resume.getFullName() != null) {
-            resumeText.append("👤 ФИО: ").append(resume.getFullName()).append("\n");
-        }
-        if (resume.getEmail() != null) {
-            resumeText.append("📧 Email: ").append(resume.getEmail()).append("\n");
-        }
-        if (resume.getPhone() != null) {
-            resumeText.append("📱 Телефон: ").append(resume.getPhone()).append("\n");
-        }
-        if (resume.getCity() != null) {
-            resumeText.append("🏙️ Город: ").append(resume.getCity()).append("\n");
-        }
-        if (resume.getPosition() != null) {
-            resumeText.append("💼 Должность: ").append(resume.getPosition()).append("\n");
-        }
-
+        String resumeText = MessageGenerator.generateResumeMessage(resume);
         ReplyKeyboardMarkup keyboard = createSimpleKeyboard(EDIT_RESUME, BACK);
-
         return SendMessage.builder()
                 .chatId(chatId.toString())
-                .text(resumeText.toString())
+                .text(resumeText)
                 .replyMarkup(keyboard)
                 .build();
     }
@@ -265,7 +248,7 @@ public class NavigationHandler {
                 .build();
     }
 
-    private BotApiMethod<?> searchVacancies(Long chatId) {
+    private BotApiMethod<?> handleSearchVacancies(Long chatId) {
         return searchVacancies(chatId, 0);
     }
 
@@ -383,9 +366,11 @@ public class NavigationHandler {
 
         // Отвечаем на callback query сразу
         try {
-            messageSender.execute(AnswerCallbackQuery.builder()
+            messageSender.execute(
+                    AnswerCallbackQuery.builder()
                     .callbackQueryId(callbackQuery.getId())
-                    .build());
+                    .build()
+            );
         } catch (TelegramApiException e) {
             log.error("Error answering callback query", e);
         }

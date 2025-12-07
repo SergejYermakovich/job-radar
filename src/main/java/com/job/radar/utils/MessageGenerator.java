@@ -1,5 +1,6 @@
 package com.job.radar.utils;
 
+import com.job.radar.model.entity.Resume;
 import com.job.radar.model.integration.Salary;
 import com.job.radar.model.integration.Vacancy;
 import lombok.experimental.UtilityClass;
@@ -57,5 +58,27 @@ public class MessageGenerator {
         }
 
         return messageText.toString();
+    }
+
+    public String generateResumeMessage(Resume resume) {
+        StringBuilder resumeText = new StringBuilder("📄 Ваше резюме:\n\n");
+
+        if (resume.getFullName() != null) {
+            resumeText.append("👤 ФИО: ").append(resume.getFullName()).append("\n");
+        }
+        if (resume.getEmail() != null) {
+            resumeText.append("📧 Email: ").append(resume.getEmail()).append("\n");
+        }
+        if (resume.getPhone() != null) {
+            resumeText.append("📱 Телефон: ").append(resume.getPhone()).append("\n");
+        }
+        if (resume.getCity() != null) {
+            resumeText.append("🏙️ Город: ").append(resume.getCity()).append("\n");
+        }
+        if (resume.getPosition() != null) {
+            resumeText.append("💼 Должность: ").append(resume.getPosition()).append("\n");
+        }
+
+        return resumeText.toString();
     }
 }
