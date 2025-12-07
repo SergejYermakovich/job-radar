@@ -70,10 +70,6 @@ public class NavigationHandler {
             return showMainMenu(chatId);
         }
 
-        if (CMD_TEST.equals(text)) {
-            return showTest(chatId);
-        }
-
         return handleNavigation(chatId, text);
     }
 
@@ -178,7 +174,6 @@ public class NavigationHandler {
         }
 
         // TODO: Добавить обработку "📋 Мои отклики"
-
         return keyboardService.showVacanciesMenu(chatId);
     }
 
@@ -267,24 +262,6 @@ public class NavigationHandler {
         return SendMessage.builder()
                 .chatId(chatId.toString())
                 .text("Главное меню:")
-                .replyMarkup(keyboardService.createMainMenuKeyboard())
-                .build();
-    }
-
-    private BotApiMethod<?> showTest(Long chatId) {
-        VacancyResponse response = null;
-        try {
-            response = headHunterHttpService.searchVacancies("java");
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-
-        for (Vacancy vacancy : response.getVacancies()) {
-            LoggerUtil.log(vacancy);
-        }
-        return SendMessage.builder()
-                .chatId(chatId.toString())
-                .text("vacancies: " + response.getFound())
                 .replyMarkup(keyboardService.createMainMenuKeyboard())
                 .build();
     }
